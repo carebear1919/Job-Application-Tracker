@@ -20,7 +20,6 @@ import { ContactModal, type Contact as ModalContact } from './components/Contact
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useThemeCustomization } from './hooks/useThemeCustomization';
 import { SettingsPanel } from './components/SettingsPanel';
-import { ConversionFunnel } from './components/ConversionFunnel';
 import { StatusBreakdownDonut } from './components/StatusBreakdownDonut';
 import { WeeklyVolumeChart } from './components/WeeklyVolumeChart';
 
@@ -99,7 +98,7 @@ interface CustomTooltipProps {
 
 // --- Components ---
 
-const StatCard = ({ label, value, icon, trend, colorVar, delay, theme }: StatCardProps) => (
+const StatCard = React.memo(({ label, value, icon, trend, colorVar, delay, theme }: StatCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -129,9 +128,9 @@ const StatCard = ({ label, value, icon, trend, colorVar, delay, theme }: StatCar
       {React.cloneElement(icon, { size: 24, className: "text-inherit" } as any)}
     </div>
   </motion.div>
-);
+));
 
-const CustomTooltip = ({ active, payload, theme }: CustomTooltipProps) => {
+const CustomTooltip = React.memo(({ active, payload, theme }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className={cn(
@@ -146,7 +145,7 @@ const CustomTooltip = ({ active, payload, theme }: CustomTooltipProps) => {
     );
   }
   return null;
-};
+});
 
 // --- Main Application ---
 
@@ -503,7 +502,7 @@ export default function App() {
             icon={<Briefcase />} 
             colorVar="--color-primary" 
             trend="+12% activity"
-            delay={0.1}
+            delay={0}
             theme={theme}
           />
           <StatCard 
@@ -511,7 +510,7 @@ export default function App() {
             value={kpis.interviews} 
             icon={<Clock />} 
             colorVar="--color-secondary" 
-            delay={0.2}
+            delay={0}
             theme={theme}
           />
           <StatCard 
@@ -520,7 +519,7 @@ export default function App() {
             icon={<TrendingUp />} 
             colorVar="--color-secondary" 
             trend="Positive"
-            delay={0.3}
+            delay={0}
             theme={theme}
           />
           <StatCard 
@@ -528,7 +527,7 @@ export default function App() {
             value={kpis.offers} 
             icon={<Trophy />} 
             colorVar="--color-accent" 
-            delay={0.4}
+            delay={0}
             theme={theme}
           />
         </div>
@@ -537,27 +536,12 @@ export default function App() {
         {showCharts && (
           <>
             {/* New Analytics Charts */}
-            {/* Conversion Funnel & Status Breakdown */}
+            {/* Status Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="lg:col-span-6"
-              >
-                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
-                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
-                    <TrendingUp size={14} className="text-indigo-500" />
-                    Conversion Funnel
-                  </h3>
-                  <ConversionFunnel jobs={jobs} theme={theme} colors={{ primary: colors.primary, accent: colors.accent, offer: colors.offer }} />
-                </div>
-              </motion.div>
-
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
+                transition={{ duration: 0.3 }}
                 className="lg:col-span-6"
               >
                 <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
@@ -568,15 +552,12 @@ export default function App() {
                   <StatusBreakdownDonut jobs={jobs} theme={theme} colors={colors as any} />
                 </div>
               </motion.div>
-            </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                className="lg:col-span-12"
+                transition={{ duration: 0.3 }}
+                className="lg:col-span-6"
               >
                 <div className={cn("p-8 h-full", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
                   <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
@@ -616,7 +597,7 @@ export default function App() {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
+                transition={{ duration: 0.3 }}
               >
                 <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
                   <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
@@ -981,7 +962,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+              className="absolute inset-0 bg-black/60"
               onClick={() => setIsCommandOpen(false)}
             />
             <motion.div 
@@ -1049,13 +1030,15 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/40 pointer-events-auto"
               onClick={() => setIsModalOpen(false)}
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
               className={cn(
                 "w-full max-w-4xl relative z-120 rounded-4xl shadow-2xl p-0 overflow-hidden pointer-events-auto border",
                 theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200"
@@ -1419,14 +1402,15 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-md pointer-events-auto"
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 bg-black/40 pointer-events-auto"
               onClick={handleWelcomeDismiss}
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: "spring", bounce: 0.3 }}
+              transition={{ duration: 0.2 }}
               className={cn(
                 "w-full max-w-lg relative z-10 rounded-3xl shadow-2xl p-10 pointer-events-auto border",
                 theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200"
@@ -1519,14 +1503,14 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/70 backdrop-blur-md pointer-events-auto"
+              className="absolute inset-0 bg-black/60 pointer-events-auto"
               onClick={() => setShowResetConfirm(false)}
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ type: "spring", bounce: 0.2 }}
+              transition={{ duration: 0.2 }}
               className={cn(
                 "w-full max-w-md relative z-10 rounded-3xl shadow-2xl p-8 pointer-events-auto border",
                 theme === 'dark' ? "bg-[#09090b] border-red-500/30" : "bg-white border-red-200"
@@ -1580,7 +1564,7 @@ export default function App() {
         whileTap={{ scale: 0.95 }}
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.5 }}
+        transition={{ duration: 0.2 }}
         title="Add new job application"
       >
         <Plus size={24} />
