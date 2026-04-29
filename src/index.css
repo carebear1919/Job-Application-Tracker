@@ -12,6 +12,18 @@
   --radius-2xl: 1rem;
 }
 
+:root {
+  --color-primary: #6366f1;
+  --color-accent: #8b5cf6;
+  --color-secondary: #f59e0b;
+  --color-applied: #6366f1;
+  --color-interviewing: #8b5cf6;
+  --color-technical: #f59e0b;
+  --color-offer: #10b981;
+  --color-rejected: #ef4444;
+  --color-ghosted: #71717a;
+}
+
 @layer base {
   body {
     @apply antialiased transition-colors duration-300;

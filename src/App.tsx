@@ -10,12 +10,19 @@ import {
   LayoutDashboard, ListTodo, Target, Trophy,
   ChevronRight, Sun, Moon, X, Send, Command,
   User, Tag, FileText, AlertCircle, Calendar,
-  MessageSquare, Terminal, Settings, Eye
+  MessageSquare, Terminal, Settings, Eye, Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
+import { ContactModal, type Contact as ModalContact } from './components/ContactModal';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useThemeCustomization } from './hooks/useThemeCustomization';
+import { SettingsPanel } from './components/SettingsPanel';
+import { ConversionFunnel } from './components/ConversionFunnel';
+import { StatusBreakdownDonut } from './components/StatusBreakdownDonut';
+import { WeeklyVolumeChart } from './components/WeeklyVolumeChart';
 
 // --- Utility ---
 function cn(...inputs: ClassValue[]) {
@@ -27,7 +34,7 @@ type JobStatus = 'Applied' | 'Interviewing' | 'Technical' | 'Offer' | 'Rejected'
 
 interface Contact {
   name: string;
-  role: string;
+  role?: string;
   email?: string;
   linkedin?: string;
 }
@@ -61,7 +68,7 @@ const INITIAL_JOBS: Job[] = [
     salary: '$120k', 
     link: 'https://google.com/careers',
     skills: ['React', 'TypeScript', 'D3.js'],
-    contacts: [{ name: 'Sarah Chen', role: 'Technical Recruiter' }],
+    contacts: [{ name: 'Sarah Chen', role: 'Technical Recruiter', email: 'sarah@google.com' }],
     notes: 'Asked about web performance and accessibility.'
   },
   { 
@@ -145,7 +152,7 @@ const COMMON_SKILLS = [
 
 // --- Components ---
 
-const StatCard = ({ label, value, icon, trend, color, delay, theme }: any) => (
+const StatCard = ({ label, value, icon, trend, colorVar, delay, theme }: any) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -165,7 +172,13 @@ const StatCard = ({ label, value, icon, trend, color, delay, theme }: any) => (
         </div>
       )}
     </div>
-    <div className={cn("p-3 rounded-xl bg-opacity-10", color)}>
+    <div 
+      className="p-3 rounded-xl bg-opacity-10"
+      style={{
+        backgroundColor: `var(${colorVar}) / 0.1`,
+        color: `var(${colorVar})`
+      }}
+    >
       {React.cloneElement(icon, { size: 24, className: "text-inherit" })}
     </div>
   </motion.div>
@@ -175,7 +188,7 @@ const CustomTooltip = ({ active, payload, theme }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className={cn(
-        "border p-3 rounded-xl shadow-xl z-[200]",
+        "border p-3 rounded-xl shadow-xl z-200",
         theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200 shadow-lg text-slate-900"
       )}>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{payload[0].name}</p>
@@ -191,7 +204,7 @@ const CustomTooltip = ({ active, payload, theme }: any) => {
 // --- Main Application ---
 
 export default function App() {
-  const [jobs, setJobs] = useState<Job[]>(INITIAL_JOBS);
+  const [jobs, setJobs] = useLocalStorage<Job[]>('job_applications', INITIAL_JOBS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'All'>('All');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -199,6 +212,14 @@ export default function App() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'default' | 'interview'>('default');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Theme Customization Hook
+  const { colors, updateColor, resetColors } = useThemeCustomization();
+  
+  // Contact Modal State
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [editingContactIndex, setEditingContactIndex] = useState<number | null>(null);
   
   // Form State
   const [jobForm, setJobForm] = useState<Partial<Job>>({
@@ -257,6 +278,36 @@ export default function App() {
   const handleDeleteJob = (id: string) => {
     setJobs(prev => prev.filter(j => j.id !== id));
     setIsModalOpen(false);
+  };
+
+  const handleOpenContactModal = (contactIndex?: number) => {
+    if (contactIndex !== undefined) {
+      setEditingContactIndex(contactIndex);
+    } else {
+      setEditingContactIndex(null);
+    }
+    setIsContactModalOpen(true);
+  };
+
+  const handleSaveContact = (contact: ModalContact) => {
+    const newContacts = [...(jobForm.contacts || [])];
+    
+    if (editingContactIndex !== null) {
+      newContacts[editingContactIndex] = contact;
+    } else {
+      newContacts.push(contact);
+    }
+    
+    setJobForm({ ...jobForm, contacts: newContacts });
+    setIsContactModalOpen(false);
+    setEditingContactIndex(null);
+  };
+
+  const handleDeleteContact = (index: number) => {
+    setJobForm({
+      ...jobForm,
+      contacts: jobForm.contacts?.filter((_, i) => i !== index) || []
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -363,7 +414,7 @@ export default function App() {
       "min-h-screen transition-colors duration-500 font-sans selection:bg-indigo-500/30",
       theme === 'dark' ? "bg-[#09090b] text-slate-50" : "bg-slate-50 text-slate-900"
     )}>
-      <div className="max-w-[1400px] mx-auto p-6 md:p-10">
+      <div className="max-w-7xl mx-auto p-6 md:p-10">
         
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
@@ -375,7 +426,7 @@ export default function App() {
               <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                 <Target size={18} className="text-white" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight uppercase tracking-tighter">Career Pipeline</h1>
+              <h1 className="text-2xl font-bold tracking-tighter uppercase">Career Pipeline</h1>
             </div>
             <p className={cn("text-sm", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>
               Managing your career growth for July 2026 Breakthrough
@@ -385,7 +436,7 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-3 w-full md:w-auto"
+            className="flex items-center gap-3 w-full md:w-auto relative"
           >
             <div className={cn(
               "hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-bold tracking-widest uppercase",
@@ -395,6 +446,7 @@ export default function App() {
             </div>
             <button 
               onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className={cn(
                 "p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95",
                 theme === 'dark' ? "bg-white/5 border-white/10 text-amber-400" : "bg-white border-slate-200 text-indigo-600 shadow-sm"
@@ -402,6 +454,26 @@ export default function App() {
             >
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
+            <button 
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+              aria-label="Settings"
+              className={cn(
+                "p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95",
+                theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400 hover:text-indigo-400" : "bg-white border-slate-200 text-slate-600 hover:text-indigo-600 shadow-sm"
+              )}
+            >
+              <Settings size={20} />
+            </button>
+            <SettingsPanel
+              isOpen={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
+              theme={theme}
+              colors={colors}
+              onColorChange={updateColor}
+              onResetTheme={resetColors}
+              jobs={jobs}
+              kpis={kpis}
+            />
             <button 
               onClick={openAddModal}
               className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest"
@@ -417,7 +489,7 @@ export default function App() {
             label="Active Applications" 
             value={kpis.total} 
             icon={<Briefcase />} 
-            color="bg-indigo-500 text-indigo-400" 
+            colorVar="--color-primary" 
             trend="+12% activity"
             delay={0.1}
             theme={theme}
@@ -426,7 +498,7 @@ export default function App() {
             label="In-Cycle Interviews" 
             value={kpis.interviews} 
             icon={<Clock />} 
-            color="bg-amber-500 text-amber-400" 
+            colorVar="--color-secondary" 
             delay={0.2}
             theme={theme}
           />
@@ -434,7 +506,7 @@ export default function App() {
             label="Global Feedback" 
             value={kpis.rate} 
             icon={<TrendingUp />} 
-            color="bg-emerald-500 text-emerald-400" 
+            colorVar="--color-secondary" 
             trend="Positive"
             delay={0.3}
             theme={theme}
@@ -443,50 +515,27 @@ export default function App() {
             label="Offers Secured" 
             value={kpis.offers} 
             icon={<Trophy />} 
-            color="bg-purple-500 text-purple-400" 
+            colorVar="--color-accent" 
             delay={0.4}
             theme={theme}
           />
         </div>
 
-        {/* Charts Section */}
+        {/* New Analytics Charts */}
+        {/* Conversion Funnel & Status Breakdown */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="lg:col-span-4"
+            className="lg:col-span-6"
           >
-            <div className={cn("p-8 h-full", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+            <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
               <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
-                <LayoutDashboard size={14} className="text-indigo-500" />
-                Pipeline State
+                <TrendingUp size={14} className="text-indigo-500" />
+                Conversion Funnel
               </h3>
-              <div className="h-[280px] w-full relative">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie 
-                      data={statusData} 
-                      innerRadius={80} 
-                      outerRadius={105} 
-                      paddingAngle={8} 
-                      dataKey="value"
-                      stroke="none"
-                      onClick={(data) => setStatusFilter(data.name as JobStatus)}
-                      className="cursor-pointer"
-                    >
-                      {statusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip theme={theme} />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-3xl font-bold">{kpis.total}</span>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Total</span>
-                </div>
-              </div>
+              <ConversionFunnel jobs={jobs} theme={theme} colors={{ primary: colors.primary, accent: colors.accent, offer: colors.offer }} />
             </div>
           </motion.div>
 
@@ -494,14 +543,32 @@ export default function App() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="lg:col-span-8"
+            className="lg:col-span-6"
+          >
+            <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                <LayoutDashboard size={14} className="text-indigo-500" />
+                Status Breakdown
+              </h3>
+              <StatusBreakdownDonut jobs={jobs} theme={theme} colors={colors} />
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="lg:col-span-12"
           >
             <div className={cn("p-8 h-full", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
               <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
                 <Tag size={14} className="text-indigo-500" />
                 Technical Skill Heatmap
               </h3>
-              <div className="h-[280px] w-full">
+              <div className="h-70 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     layout="vertical" 
@@ -521,10 +588,27 @@ export default function App() {
                       tick={{ fontWeight: 600 }}
                     />
                     <Tooltip cursor={{ fill: theme === 'dark' ? '#27272a' : '#f1f5f9' }} content={<CustomTooltip theme={theme} />} />
-                    <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={18} />
+                    <Bar dataKey="count" fill={colors.primary} radius={[0, 4, 4, 0]} barSize={18} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Weekly Volume Chart */}
+        <div className="mb-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+          >
+            <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                <ListTodo size={14} className="text-indigo-500" />
+                Weekly Application Volume
+              </h3>
+              <WeeklyVolumeChart jobs={jobs} theme={theme} />
             </div>
           </motion.div>
         </div>
@@ -579,7 +663,7 @@ export default function App() {
               <thead>
                 <tr className={cn(
                   "text-[10px] uppercase tracking-[0.2em] font-bold border-b",
-                  theme === 'dark' ? "bg-white/[0.02] text-slate-500 border-slate-800/50" : "bg-slate-50/50 text-slate-400 border-slate-200"
+                  theme === 'dark' ? "bg-white/2 text-slate-500 border-slate-800/50" : "bg-slate-50/50 text-slate-400 border-slate-200"
                 )}>
                   <th className="px-8 py-5">Corporate entity</th>
                   <th className="px-8 py-5">current state</th>
@@ -602,7 +686,7 @@ export default function App() {
                         onClick={() => openEditModal(job)}
                         className={cn(
                           "transition-all group cursor-pointer relative",
-                          theme === 'dark' ? "hover:bg-indigo-500/[0.03]" : "hover:bg-indigo-50",
+                          theme === 'dark' ? "hover:bg-indigo-500/3" : "hover:bg-indigo-50",
                           staleLevel === 'critical' && theme === 'dark' ? "shadow-[inset_4px_0_0_#ef4444]" : staleLevel === 'critical' ? "shadow-[inset_4px_0_0_#ef4444] bg-red-50/30" : "",
                           staleLevel === 'warning' && theme === 'dark' ? "shadow-[inset_4px_0_0_#f59e0b]" : staleLevel === 'warning' ? "shadow-[inset_4px_0_0_#f59e0b] bg-amber-50/30" : ""
                         )}
@@ -718,7 +802,7 @@ export default function App() {
       {/* Command Palette (Ctrl+K) */}
       <AnimatePresence>
         {isCommandOpen && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 md:px-0">
+          <div className="fixed inset-0 z-100 flex items-start justify-center pt-[15vh] px-4 md:px-0">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -751,7 +835,7 @@ export default function App() {
                   }}
                 />
               </div>
-              <div className="p-3 max-h-[400px] overflow-y-auto">
+              <div className="p-3 max-h-100 overflow-y-auto">
                 <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Application pipeline</div>
                 <button 
                   onClick={openAddModal}
@@ -773,8 +857,8 @@ export default function App() {
               </div>
               <div className={cn("px-5 py-3 border-t flex items-center justify-between text-[10px] font-bold", theme === 'dark' ? "bg-black/20 border-slate-800 text-slate-500" : "bg-slate-50 border-slate-200 text-slate-400")}>
                 <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-1 uppercase tracking-widest"><kbd className="bg-slate-700/50 rounded px-1 min-w-[20px] text-center inline-block">↵</kbd> select</span>
-                  <span className="flex items-center gap-1 uppercase tracking-widest"><kbd className="bg-slate-700/50 rounded px-1 min-w-[20px] text-center inline-block">↑↓</kbd> navigate</span>
+                  <span className="flex items-center gap-1 uppercase tracking-widest"><kbd className="bg-slate-700/50 rounded px-1 min-w-5 text-center inline-block">↵</kbd> select</span>
+                  <span className="flex items-center gap-1 uppercase tracking-widest"><kbd className="bg-slate-700/50 rounded px-1 min-w-5 text-center inline-block">↑↓</kbd> navigate</span>
                 </div>
                 <span className="uppercase tracking-[0.2em]">Career Hub v2.4</span>
               </div>
@@ -786,7 +870,7 @@ export default function App() {
       {/* Main Job Detail/Add Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto px-4 py-8 md:py-16 pointer-events-none">
+          <div className="fixed inset-0 z-110 flex items-start justify-center overflow-y-auto px-4 py-8 md:py-16 pointer-events-none">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -799,16 +883,16 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className={cn(
-                "w-full max-w-4xl relative z-[120] rounded-[2rem] shadow-2xl p-0 overflow-hidden pointer-events-auto border",
+                "w-full max-w-4xl relative z-120 rounded-4xl shadow-2xl p-0 overflow-hidden pointer-events-auto border",
                 theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200"
               )}
             >
-              <div className="flex flex-col lg:flex-row min-h-[600px]">
+              <div className="flex flex-col lg:flex-row min-h-150">
                 
                 {/* Modal Sidebar */}
                 <div className={cn(
                   "w-full lg:w-72 p-10 border-b lg:border-b-0 lg:border-r shrink-0",
-                  theme === 'dark' ? "bg-white/[0.02] border-slate-800" : "bg-slate-50/50 border-slate-100"
+                  theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50/50 border-slate-100"
                 )}>
                   <div className="mb-10 text-center lg:text-left">
                     <div className="flex justify-center lg:justify-start mb-4">
@@ -816,7 +900,7 @@ export default function App() {
                         <Briefcase size={32} />
                       </div>
                     </div>
-                    <h2 className={cn("text-2xl font-bold tracking-tight uppercase tracking-tighter mb-1", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                    <h2 className={cn("text-2xl font-bold tracking-tighter uppercase mb-1", theme === 'dark' ? "text-white" : "text-slate-900")}>
                         {jobForm.company || "CORPORATE"}
                     </h2>
                     <p className="text-indigo-500 font-bold text-xs uppercase tracking-widest">{jobForm.role || "POSITION"}</p>
@@ -878,6 +962,7 @@ export default function App() {
                     </h3>
                     <button 
                       onClick={() => setIsModalOpen(false)}
+                      aria-label="Close modal"
                       className={cn(
                         "p-2.5 rounded-xl transition-all",
                         theme === 'dark' ? "bg-white/5 border border-white/10 text-slate-500 hover:text-white" : "bg-slate-100 text-slate-400 hover:text-slate-900"
@@ -978,13 +1063,13 @@ export default function App() {
                       <div className="space-y-4">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Tech stack & Skills</label>
                         <div className={cn(
-                                "flex flex-wrap gap-2 p-2 rounded-2xl border min-h-[60px]",
-                                theme === 'dark' ? "bg-white/[0.02] border-slate-800/50" : "bg-slate-50 border-slate-200"
+                                "flex flex-wrap gap-2 p-2 rounded-2xl border min-h-15",
+                                theme === 'dark' ? "bg-white/2 border-slate-800/50" : "bg-slate-50 border-slate-200"
                             )}>
                           {jobForm.skills?.map(skill => (
                             <span key={skill} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-tight">
                               {skill}
-                              <X size={14} className="cursor-pointer hover:text-white" onClick={() => setJobForm({...jobForm, skills: jobForm.skills?.filter(s => s !== skill)})} />
+                              <X size={14} aria-label="Delete skill" className="cursor-pointer hover:text-white" onClick={() => setJobForm({...jobForm, skills: jobForm.skills?.filter(s => s !== skill)})} />
                             </span>
                           ))}
                           <div className="relative flex-1">
@@ -1050,15 +1135,32 @@ export default function App() {
                             <User size={14} className="text-indigo-400" />
                             Relational Contacts
                           </div>
-                          <div className={cn("rounded-3xl border p-4 space-y-3", theme === 'dark' ? "bg-white/[0.02] border-slate-800" : "bg-slate-50/50 border-slate-200")}>
+                          <div className={cn("rounded-3xl border p-4 space-y-3", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50/50 border-slate-200")}>
                             {jobForm.contacts && jobForm.contacts.length > 0 ? jobForm.contacts.map((contact, i) => (
                               <div key={i} className={cn("flex items-start justify-between p-4 rounded-2xl border", theme === 'dark' ? "bg-black/20 border-slate-800" : "bg-white border-slate-200")}>
                                 <div>
                                   <p className={cn("font-bold text-sm tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}>{contact.name}</p>
-                                  <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest mt-0.5">{contact.role}</p>
+                                  {contact.email && <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest mt-0.5">{contact.email}</p>}
+                                  {contact.linkedin && <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest mt-0.5">LinkedIn</p>}
+                                  {!contact.email && !contact.linkedin && contact.role && <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest mt-0.5">{contact.role}</p>}
                                 </div>
                                 <div className="flex gap-2">
-                                  <button onClick={() => setJobForm({...jobForm, contacts: jobForm.contacts?.filter((_, idx) => idx !== i)})} className="p-2 rounded-lg bg-red-500/5 text-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition-all"><X size={14} /></button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleOpenContactModal(i)}
+                                    className="p-2 rounded-lg bg-indigo-500/5 text-indigo-500/50 hover:bg-indigo-500/10 hover:text-indigo-500 transition-all" 
+                                    aria-label="Edit contact"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleDeleteContact(i)}
+                                    className="p-2 rounded-lg bg-red-500/5 text-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                    aria-label="Delete contact"
+                                  >
+                                    <X size={14} />
+                                  </button>
                                 </div>
                               </div>
                             )) : (
@@ -1067,13 +1169,14 @@ export default function App() {
                               </div>
                             )}
                             <button 
-                                onClick={() => setJobForm({...jobForm, contacts: [...(jobForm.contacts || []), { name: 'Recruiter Name', role: 'Talent Acquisition' }]})}
+                                type="button"
+                                onClick={() => handleOpenContactModal()}
                                 className={cn(
                                     "w-full py-3 border border-dashed rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all",
                                     theme === 'dark' ? "border-slate-800 text-slate-500 hover:border-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5" : "border-slate-300 text-slate-400 hover:border-indigo-500 hover:text-indigo-500"
                                 )}
                             >
-                                + Inject Contact
+                                + Add Contact
                             </button>
                           </div>
                         </section>
@@ -1084,7 +1187,7 @@ export default function App() {
                             Application Materials
                           </div>
                           <div className="space-y-3">
-                            <div className={cn("p-4 rounded-2xl border flex items-center justify-between transition-all hover:border-indigo-500/50", theme === 'dark' ? "bg-white/[0.02] border-slate-800" : "bg-white border-slate-200")}>
+                            <div className={cn("p-4 rounded-2xl border flex items-center justify-between transition-all hover:border-indigo-500/50", theme === 'dark' ? "bg-white/2 border-slate-8000" : "bg-white border-slate-200")}>
                                 <div className="flex items-center gap-3">
                                     <div className={cn("p-2.5 rounded-xl", theme === 'dark' ? "bg-slate-800 text-indigo-400" : "bg-slate-50 text-indigo-600 shadow-sm")}><FileText size={16} /></div>
                                     <div>
@@ -1092,7 +1195,7 @@ export default function App() {
                                         <p className="text-[9px] text-slate-500 font-bold mt-0.5 uppercase tracking-tighter">PDF • 1.2 MB</p>
                                     </div>
                                 </div>
-                                <div className="p-2 rounded-lg hover:bg-indigo-500/10 text-slate-600 hover:text-indigo-500 transition-all cursor-pointer"><Eye size={16} /></div>
+                                <div className="p-2 rounded-lg hover:bg-indigo-500/10 text-slate-600 hover:text-indigo-500 transition-all cursor-pointer" aria-label="View document"><Eye size={16} /></div>
                             </div>
                             <div className={cn("p-4 rounded-2xl border border-dashed flex items-center justify-center opacity-40 hover:opacity-100 transition-all group", theme === 'dark' ? "border-slate-800" : "border-slate-300")}>
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 group-hover:text-indigo-500">
@@ -1111,8 +1214,8 @@ export default function App() {
                         <div className="relative">
                             <textarea 
                             className={cn(
-                                "w-full h-48 p-8 rounded-[2rem] border outline-none font-mono text-xs leading-relaxed transition-all",
-                                theme === 'dark' ? "bg-white/[0.01] border-slate-800 text-indigo-300/80 focus:border-indigo-500/50 shadow-inner" : "bg-slate-50/50 border-slate-200 text-slate-600 focus:border-indigo-500/30"
+                                "w-full h-48 p-8 rounded-4xl border outline-none font-mono text-xs leading-relaxed transition-all",
+                                theme === 'dark' ? "bg-white/1 border-slate-800 text-indigo-300/80 focus:border-indigo-500/50 shadow-inner" : "bg-slate-50/50 border-slate-200 text-slate-600 focus:border-indigo-500/30"
                             )}
                             placeholder="Log company intelligence, cultural fit details, or technical interview questions..."
                             value={jobForm.notes || ''}
@@ -1133,6 +1236,18 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Contact Modal */}
+      <ContactModal 
+        isOpen={isContactModalOpen}
+        onClose={() => {
+          setIsContactModalOpen(false);
+          setEditingContactIndex(null);
+        }}
+        onSave={handleSaveContact}
+        initialContact={editingContactIndex !== null && jobForm.contacts ? jobForm.contacts[editingContactIndex] : undefined}
+        theme={theme}
+      />
     </div>
   );
 }
