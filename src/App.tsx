@@ -56,78 +56,7 @@ interface Job {
   coverLetterUrl?: string;
 }
 
-const INITIAL_JOBS: Job[] = [
-  { 
-    id: '1', 
-    company: 'Google', 
-    role: 'Frontend Engineer', 
-    source: 'LinkedIn', 
-    status: 'Interviewing', 
-    date: '2026-04-15', 
-    updatedAt: '2026-04-20', 
-    salary: '$120k', 
-    link: 'https://google.com/careers',
-    skills: ['React', 'TypeScript', 'D3.js'],
-    contacts: [{ name: 'Sarah Chen', role: 'Technical Recruiter', email: 'sarah@google.com' }],
-    notes: 'Asked about web performance and accessibility.'
-  },
-  { 
-    id: '2', 
-    company: 'Vercel', 
-    role: 'Fullstack Dev', 
-    source: 'Referral', 
-    status: 'Applied', 
-    date: '2026-04-25', 
-    updatedAt: '2026-04-25', 
-    salary: '$140k', 
-    link: '#',
-    skills: ['Next.js', 'React', 'Tailwind'],
-    contacts: [{ name: 'Guillermo', role: 'Referrer' }],
-    notes: 'Referral through tech twitter.'
-  },
-  { 
-    id: '3', 
-    company: 'Canva', 
-    role: 'UI/UX Engineer', 
-    source: 'Company Site', 
-    status: 'Offer', 
-    date: '2026-04-01', 
-    updatedAt: '2026-04-10', 
-    salary: '$110k', 
-    link: '#',
-    skills: ['React', 'Framer Motion', 'UI Design'],
-    contacts: [],
-    notes: 'Standard 4-round interview process.'
-  },
-  { 
-    id: '4', 
-    company: 'Stripe', 
-    role: 'Backend Engineer', 
-    source: 'Indeed', 
-    status: 'Rejected', 
-    date: '2026-03-20', 
-    updatedAt: '2026-03-25', 
-    salary: '$150k', 
-    link: '#',
-    skills: ['Ruby', 'PostgreSQL', 'API Design'],
-    contacts: [],
-    notes: 'Great engineering bar, tough assessment.'
-  },
-  { 
-    id: '5', 
-    company: 'Linear', 
-    role: 'Product Engineer', 
-    source: 'LinkedIn', 
-    status: 'Technical', 
-    date: '2026-04-10', 
-    updatedAt: '2026-04-12', 
-    salary: '$165k', 
-    link: '#',
-    skills: ['React', 'TypeScript', 'Rust'],
-    contacts: [{ name: 'Karri Saarinen', role: 'Design Director' }],
-    notes: 'High focus on craft and performance.'
-  }
-];
+const INITIAL_JOBS: Job[] = [];
 
 const STATUS_COLORS: Record<JobStatus, string> = {
   Applied: '#6366f1',
@@ -787,8 +716,22 @@ export default function App() {
                     );
                   }) : (
                     <tr>
-                      <td colSpan={5} className="px-8 py-20 text-center text-slate-500 italic text-sm">
-                        Zero matches found for your search parameters.
+                      <td colSpan={5} className="px-8 py-20 text-center">
+                        <div className="flex flex-col items-center gap-6">
+                          <Briefcase size={64} className="text-indigo-500 opacity-30" />
+                          <div className="space-y-2">
+                            <h3 className="text-xl font-bold tracking-tight">Your Career Pipeline is Empty</h3>
+                            <p className="text-sm text-slate-500 max-w-md">
+                              Start tracking your job applications by adding your first entry. All dashboard analytics and charts will automatically activate once you have applications recorded.
+                            </p>
+                          </div>
+                          <button 
+                            onClick={openAddModal}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl flex items-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-4"
+                          >
+                            <Plus size={18} /> Add Your First Application
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )}
