@@ -10,7 +10,7 @@ import {
   LayoutDashboard, ListTodo, Target, Trophy,
   ChevronRight, Sun, Moon, X, Send, Command,
   User, Tag, FileText, AlertCircle, Calendar,
-  MessageSquare, Terminal, Settings, Eye, Edit2
+  MessageSquare, Terminal, Settings, Eye, Edit2, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -182,6 +182,26 @@ export default function App() {
     setShowWelcome(false);
     setHasSeenWelcome(true);
     openAddModal();
+  };
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const handleResetAllData = () => {
+    setShowResetConfirm(true);
+    setIsSettingsOpen(false);
+  };
+
+  const confirmReset = () => {
+    setShowResetConfirm(false);
+    setJobs([]);
+    setHasSeenWelcome(false);
+    setTimeout(() => {
+      setShowWelcome(true);
+    }, 500);
+  };
+
+  const handleShowUserGuide = () => {
+    setShowWelcome(true);
   };
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -365,7 +385,7 @@ export default function App() {
       "min-h-screen transition-colors duration-500 font-sans selection:bg-indigo-500/30",
       theme === 'dark' ? "bg-[#09090b] text-slate-50" : "bg-slate-50 text-slate-900"
     )}>
-      <div className="max-w-7xl mx-auto p-6 md:p-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-10">
         
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
@@ -396,6 +416,16 @@ export default function App() {
               <Command size={12} /> + K
             </div>
             <button 
+              onClick={handleShowUserGuide}
+              aria-label="Show User Guide"
+              className={cn(
+                "p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95",
+                theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400 hover:text-indigo-400" : "bg-white border-slate-200 text-slate-600 hover:text-indigo-600 shadow-sm"
+              )}
+            >
+              <HelpCircle size={20} />
+            </button>
+            <button 
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className={cn(
@@ -424,6 +454,7 @@ export default function App() {
               onResetTheme={resetColors}
               jobs={jobs}
               kpis={kpis}
+              onResetAllData={handleResetAllData}
             />
             <button 
               onClick={openAddModal}
@@ -565,8 +596,8 @@ export default function App() {
         </div>
 
         {/* Filters & Search */}
-        <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-96">
+        <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full sm:w-96">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
               type="text" 
@@ -582,13 +613,14 @@ export default function App() {
             />
           </div>
           
-          <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+          {/* Desktop filter buttons */}
+          <div className="hidden sm:flex items-center gap-1.5">
             {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
               <button
                 key={stat}
                 onClick={() => setStatusFilter(stat)}
                 className={cn(
-                  "text-[10px] px-4 py-2.5 rounded-xl font-bold uppercase tracking-wider transition-all border shrink-0",
+                  "text-[10px] px-3 py-2.5 rounded-xl font-bold uppercase tracking-wider transition-all border",
                   statusFilter === stat 
                     ? "bg-indigo-600/10 border-indigo-500/50 text-indigo-500" 
                     : theme === 'dark' 
@@ -599,6 +631,24 @@ export default function App() {
                 {stat}
               </button>
             ))}
+          </div>
+
+          {/* Mobile filter dropdown */}
+          <div className="sm:hidden w-full">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className={cn(
+                "w-full rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider border outline-none appearance-none",
+                theme === 'dark'
+                  ? "bg-[#18181b] border-slate-800 text-white"
+                  : "bg-white border-slate-200 text-slate-900"
+              )}
+            >
+              {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
+                <option key={stat} value={stat}>{stat}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -1301,6 +1351,62 @@ export default function App() {
         initialContact={editingContactIndex !== null && jobForm.contacts ? jobForm.contacts[editingContactIndex] : undefined}
         theme={theme}
       />
+
+      {/* Reset Confirmation Modal */}
+      <AnimatePresence>
+        {showResetConfirm && (
+          <div className="fixed inset-0 z-160 flex items-center justify-center px-4 pointer-events-none">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-md pointer-events-auto"
+              onClick={() => setShowResetConfirm(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: "spring", bounce: 0.2 }}
+              className={cn(
+                "w-full max-w-md relative z-10 rounded-3xl shadow-2xl p-8 pointer-events-auto border",
+                theme === 'dark' ? "bg-[#09090b] border-red-500/30" : "bg-white border-red-200"
+              )}
+            >
+              <div className="text-center space-y-6">
+                <div className="w-16 h-16 rounded-2xl bg-red-500/10 mx-auto flex items-center justify-center border border-red-500/20">
+                  <AlertCircle size={32} className="text-red-500" />
+                </div>
+                
+                <div className="space-y-3">
+                  <h2 className="text-xl font-bold tracking-tighter uppercase">Reset Everything?</h2>
+                  <p className="text-sm text-slate-500">
+                    This will <span className="text-red-500 font-bold">PERMANENTLY DELETE</span> all your saved applications and reset the app completely. This action cannot be undone.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-2">
+                  <button 
+                    onClick={confirmReset}
+                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl transition-all active:scale-[0.98] uppercase tracking-[0.2em]"
+                  >
+                    Yes, Reset Everything
+                  </button>
+                  <button 
+                    onClick={() => setShowResetConfirm(false)}
+                    className={cn(
+                      "w-full py-3 rounded-xl text-sm font-bold uppercase tracking-[0.2em] transition-all",
+                      theme === 'dark' ? "text-slate-500 hover:text-white" : "text-slate-500 hover:text-slate-900"
+                    )}
+                  >
+                    Cancel, Keep My Data
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

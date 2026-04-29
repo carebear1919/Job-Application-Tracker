@@ -28,6 +28,44 @@
   body {
     @apply antialiased transition-colors duration-300;
   }
+
+  /* Custom Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
+  }
+
+  /* Firefox Scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 transparent;
+  }
+
+  /* Light Theme Scrollbar */
+  :root:not(.dark) ::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+  }
+
+  :root:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+  }
+
+  :root:not(.dark) * {
+    scrollbar-color: #d4d4d8 transparent;
+  }
 }
 
 @layer components {

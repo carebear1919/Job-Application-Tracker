@@ -19,6 +19,7 @@ interface SettingsPanelProps {
   onResetTheme: () => void;
   jobs: any[];
   kpis: any;
+  onResetAllData: () => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -30,6 +31,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onResetTheme,
   jobs,
   kpis,
+  onResetAllData,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'theme' | 'export'>('theme');
@@ -221,6 +223,29 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       {exporting === 'pdf' ? 'Exporting...' : 'Export as PDF'}
                     </button>
                   </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-800">
+                  <p className={cn(
+                    "text-xs font-bold uppercase tracking-widest mb-4",
+                    theme === 'dark' ? "text-red-400" : "text-red-500"
+                  )}>
+                    ⚠️ Danger Zone
+                  </p>
+                  <button
+                    onClick={onResetAllData}
+                    className={cn(
+                      "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border font-semibold text-sm transition-all",
+                      theme === 'dark'
+                        ? "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20"
+                        : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                    )}
+                  >
+                    Reset All Data & Restart
+                  </button>
+                  <p className="text-[10px] text-slate-500 mt-2 text-center">
+                    This will permanently delete all applications and reset the app
+                  </p>
                 </div>
               </div>
             )}
