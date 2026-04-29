@@ -162,6 +162,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>('has_seen_welcome', false);
+  const [showCharts, setShowCharts] = useLocalStorage<boolean>('show_analytics_charts', false);
 
   // Theme Customization Hook
   const { colors, updateColor, resetColors } = useThemeCustomization();
@@ -444,6 +445,17 @@ export default function App() {
               <HelpCircle size={20} />
             </button>
             <button 
+              onClick={() => setShowCharts(!showCharts)}
+              aria-label={showCharts ? 'Hide analytics charts' : 'Show analytics charts'}
+              className={cn(
+                "p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95",
+                theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400 hover:text-indigo-400" : "bg-white border-slate-200 text-slate-600 hover:text-indigo-600 shadow-sm"
+              )}
+              title={showCharts ? 'Hide charts' : 'Show charts'}
+            >
+              <LayoutDashboard size={20} />
+            </button>
+            <button 
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className={cn(
@@ -476,7 +488,7 @@ export default function App() {
             />
             <button 
               onClick={openAddModal}
-              className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest"
+              className="hidden md:flex bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl items-center justify-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest"
             >
               <Plus size={18} /> New Entry
             </button>
@@ -521,97 +533,102 @@ export default function App() {
           />
         </div>
 
-        {/* New Analytics Charts */}
-        {/* Conversion Funnel & Status Breakdown */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="lg:col-span-6"
-          >
-            <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
-                <TrendingUp size={14} className="text-indigo-500" />
-                Conversion Funnel
-              </h3>
-              <ConversionFunnel jobs={jobs} theme={theme} colors={{ primary: colors.primary, accent: colors.accent, offer: colors.offer }} />
-            </div>
-          </motion.div>
+        {/* Analytics Charts - Conditionally Rendered */}
+        {showCharts && (
+          <>
+            {/* New Analytics Charts */}
+            {/* Conversion Funnel & Status Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="lg:col-span-6"
+              >
+                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <TrendingUp size={14} className="text-indigo-500" />
+                    Conversion Funnel
+                  </h3>
+                  <ConversionFunnel jobs={jobs} theme={theme} colors={{ primary: colors.primary, accent: colors.accent, offer: colors.offer }} />
+                </div>
+              </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="lg:col-span-6"
-          >
-            <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
-                <LayoutDashboard size={14} className="text-indigo-500" />
-                Status Breakdown
-              </h3>
-              <StatusBreakdownDonut jobs={jobs} theme={theme} colors={colors as any} />
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="lg:col-span-6"
+              >
+                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <LayoutDashboard size={14} className="text-indigo-500" />
+                    Status Breakdown
+                  </h3>
+                  <StatusBreakdownDonut jobs={jobs} theme={theme} colors={colors as any} />
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
-        </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="lg:col-span-12"
-          >
-            <div className={cn("p-8 h-full", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
-                <Tag size={14} className="text-indigo-500" />
-                Technical Skill Heatmap
-              </h3>
-              <div className="h-70 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    layout="vertical" 
-                    data={skillData} 
-                    margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? "#27272a" : "#e2e8f0"} horizontal={false} vertical={true} />
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      stroke="#94a3b8" 
-                      fontSize={11} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      width={80}
-                      tick={{ fontWeight: 600 }}
-                    />
-                    <Tooltip cursor={{ fill: theme === 'dark' ? '#27272a' : '#f1f5f9' }} content={<CustomTooltip theme={theme} />} />
-                    <Bar dataKey="count" fill={colors.primary} radius={[0, 4, 4, 0]} barSize={18} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 }}
+                className="lg:col-span-12"
+              >
+                <div className={cn("p-8 h-full", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <Tag size={14} className="text-indigo-500" />
+                    Technical Skill Heatmap
+                  </h3>
+                  <div className="h-70 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        layout="vertical" 
+                        data={skillData} 
+                        margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? "#27272a" : "#e2e8f0"} horizontal={false} vertical={true} />
+                        <XAxis type="number" hide />
+                        <YAxis 
+                          type="category" 
+                          dataKey="name" 
+                          stroke="#94a3b8" 
+                          fontSize={11} 
+                          tickLine={false} 
+                          axisLine={false} 
+                          width={80}
+                          tick={{ fontWeight: 600 }}
+                        />
+                        <Tooltip cursor={{ fill: theme === 'dark' ? '#27272a' : '#f1f5f9' }} content={<CustomTooltip theme={theme} />} />
+                        <Bar dataKey="count" fill={colors.primary} radius={[0, 4, 4, 0]} barSize={18} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
-        </div>
 
-        {/* Weekly Volume Chart */}
-        <div className="mb-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-          >
-            <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
-                <ListTodo size={14} className="text-indigo-500" />
-                Weekly Application Volume
-              </h3>
-              <WeeklyVolumeChart jobs={jobs} theme={theme} />
+            {/* Weekly Volume Chart */}
+            <div className="mb-10">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+              >
+                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <ListTodo size={14} className="text-indigo-500" />
+                    Weekly Application Volume
+                  </h3>
+                  <WeeklyVolumeChart jobs={jobs} theme={theme} />
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
-        </div>
+          </>
+        )}
 
         {/* Filters & Search */}
         <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -1549,6 +1566,25 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Floating New Entry Button */}
+      <motion.button
+        onClick={openAddModal}
+        className={cn(
+          "fixed bottom-8 right-8 p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 z-50 flex items-center justify-center gap-2",
+          theme === 'dark' 
+            ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40" 
+            : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40"
+        )}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.5 }}
+        title="Add new job application"
+      >
+        <Plus size={24} />
+      </motion.button>
     </div>
   );
 }
