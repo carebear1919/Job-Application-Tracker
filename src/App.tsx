@@ -142,6 +142,8 @@ export default function App() {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'default' | 'interview'>('default');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>('has_seen_welcome', false);
 
   // Theme Customization Hook
   const { colors, updateColor, resetColors } = useThemeCustomization();
@@ -161,6 +163,26 @@ export default function App() {
   const [sourceInput, setSourceInput] = useState("");
   const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
   const [skillInput, setSkillInput] = useState("");
+
+  // Show welcome modal on first visit
+  useEffect(() => {
+    if (!hasSeenWelcome) {
+      setTimeout(() => {
+        setShowWelcome(true);
+      }, 800);
+    }
+  }, [hasSeenWelcome]);
+
+  const handleWelcomeDismiss = () => {
+    setShowWelcome(false);
+    setHasSeenWelcome(true);
+  };
+
+  const handleWelcomeStart = () => {
+    setShowWelcome(false);
+    setHasSeenWelcome(true);
+    openAddModal();
+  };
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
@@ -1173,6 +1195,94 @@ export default function App() {
 
                     </motion.div>
                   )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Welcome Onboarding Modal */}
+      <AnimatePresence>
+        {showWelcome && (
+          <div className="fixed inset-0 z-150 flex items-center justify-center px-4 pointer-events-none">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md pointer-events-auto"
+              onClick={handleWelcomeDismiss}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", bounce: 0.3 }}
+              className={cn(
+                "w-full max-w-lg relative z-10 rounded-3xl shadow-2xl p-10 pointer-events-auto border",
+                theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200"
+              )}
+            >
+              <div className="text-center space-y-6">
+                <div className="w-20 h-20 rounded-2xl bg-indigo-600 mx-auto flex items-center justify-center shadow-xl shadow-indigo-600/30">
+                  <Target size={40} className="text-white" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold tracking-tighter uppercase">Welcome to Career Pipeline</h2>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                    Track all your job applications in one place. Visualize your progress, identify bottlenecks, and land your next role faster.
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-4">
+                  <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 flex-shrink-0">
+                      <Briefcase size={18} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">Track Applications</p>
+                      <p className="text-xs text-slate-500">Log every opportunity with full details</p>
+                    </div>
+                  </div>
+                  
+                  <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 flex-shrink-0">
+                      <LayoutDashboard size={18} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">Analytics Dashboard</p>
+                      <p className="text-xs text-slate-500">See your conversion rates at a glance</p>
+                    </div>
+                  </div>
+                  
+                  <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 flex-shrink-0">
+                      <Clock size={18} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">Follow Up Reminders</p>
+                      <p className="text-xs text-slate-500">Never miss an opportunity again</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                  <button 
+                    onClick={handleWelcomeStart}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/20 active:scale-[0.98] uppercase tracking-[0.2em]"
+                  >
+                    <Plus size={18} /> Add Your First Application
+                  </button>
+                  <button 
+                    onClick={handleWelcomeDismiss}
+                    className={cn(
+                      "w-full py-3 rounded-xl text-sm font-bold uppercase tracking-[0.2em] transition-all",
+                      theme === 'dark' ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-900"
+                    )}
+                  >
+                    Explore First
+                  </button>
                 </div>
               </div>
             </motion.div>
