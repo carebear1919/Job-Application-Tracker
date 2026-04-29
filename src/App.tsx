@@ -596,8 +596,8 @@ export default function App() {
         </div>
 
         {/* Filters & Search */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full sm:w-96">
+        <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:w-96">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
               type="text" 
@@ -614,13 +614,13 @@ export default function App() {
           </div>
           
           {/* Desktop filter buttons */}
-          <div className="hidden sm:flex items-center gap-1.5">
+          <div className="hidden lg:flex flex-wrap items-center gap-1.5 justify-end">
             {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
               <button
                 key={stat}
                 onClick={() => setStatusFilter(stat)}
                 className={cn(
-                  "text-[10px] px-3 py-2.5 rounded-xl font-bold uppercase tracking-wider transition-all border",
+                  "text-[10px] px-3 py-2.5 rounded-xl font-bold uppercase tracking-wider transition-all border whitespace-nowrap",
                   statusFilter === stat 
                     ? "bg-indigo-600/10 border-indigo-500/50 text-indigo-500" 
                     : theme === 'dark' 
@@ -634,182 +634,306 @@ export default function App() {
           </div>
 
           {/* Mobile filter dropdown */}
-          <div className="sm:hidden w-full">
+          <div className="lg:hidden w-full relative">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className={cn(
-                "w-full rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider border outline-none appearance-none",
+                "w-full rounded-xl pl-12 pr-10 py-3 text-sm font-bold uppercase tracking-wider border outline-none appearance-none transition-all shadow-sm",
                 theme === 'dark'
-                  ? "bg-[#18181b] border-slate-800 text-white"
-                  : "bg-white border-slate-200 text-slate-900"
+                  ? "bg-[#18181b] border-slate-800 text-slate-300 focus:ring-2 focus:ring-indigo-500/30"
+                  : "bg-white border-slate-200 text-slate-700 focus:ring-2 focus:ring-indigo-500/10"
               )}
             >
               {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
-                <option key={stat} value={stat}>{stat}</option>
+                <option key={stat} value={stat}>{stat === 'All' ? 'All Statuses' : stat}</option>
               ))}
             </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+               <ChevronRight size={16} className="rotate-90" />
+            </div>
           </div>
         </div>
 
-        {/* Main Application Table */}
+        {/* Main Application List */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className={cn("overflow-hidden", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}
+          className="w-full"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className={cn(
-                  "text-[10px] uppercase tracking-[0.2em] font-bold border-b",
-                  theme === 'dark' ? "bg-white/2 text-slate-500 border-slate-800/50" : "bg-slate-50/50 text-slate-400 border-slate-200"
-                )}>
-                  <th className="px-8 py-5">Corporate entity</th>
-                  <th className="px-8 py-5">current state</th>
-                  <th className="px-8 py-5">Stack & Skills</th>
-                  <th className="px-8 py-5">Last Cycle</th>
-                  <th className="px-8 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className={cn("divide-y", theme === 'dark' ? "divide-slate-800/50" : "divide-slate-100")}>
-                <AnimatePresence mode="popLayout">
-                  {filteredJobs.length > 0 ? filteredJobs.map((job) => {
-                    const staleLevel = getStaleLevel(job.updatedAt);
-                    return (
-                      <motion.tr 
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        key={job.id} 
-                        onClick={() => openEditModal(job)}
-                        className={cn(
-                          "transition-all group cursor-pointer relative",
-                          theme === 'dark' ? "hover:bg-indigo-500/3" : "hover:bg-indigo-50",
-                          staleLevel === 'critical' && theme === 'dark' ? "shadow-[inset_4px_0_0_#ef4444]" : staleLevel === 'critical' ? "shadow-[inset_4px_0_0_#ef4444] bg-red-50/30" : "",
-                          staleLevel === 'warning' && theme === 'dark' ? "shadow-[inset_4px_0_0_#f59e0b]" : staleLevel === 'warning' ? "shadow-[inset_4px_0_0_#f59e0b] bg-amber-50/30" : ""
-                        )}
-                      >
-                        <td className="px-8 py-6">
-                          <div className="flex flex-col">
-                            <span className={cn("font-bold mb-0.5 group-hover:text-indigo-500 transition-colors uppercase tracking-tight", theme === 'dark' ? "text-slate-100" : "text-slate-900")}>
-                              {job.company}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 leading-none">
-                              {job.role}
-                              {job.contacts.length > 0 && (
-                                <span className="flex items-center gap-0.5 text-indigo-400/70 border border-indigo-400/20 px-1 rounded">
-                                  <User size={8} /> {job.contacts.length}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <span className={cn(
-                            "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap inline-flex items-center gap-1.5",
-                            job.status === 'Offer' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-                            job.status === 'Rejected' && "bg-red-500/10 text-red-500 border-red-500/20",
-                            job.status === 'Interviewing' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-                            job.status === 'Technical' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
-                            job.status === 'Applied' && "bg-slate-500/10 text-slate-400 border-slate-500/20",
-                            job.status === 'Ghosted' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-                          )}>
-                            <div className={cn("w-1.5 h-1.5 rounded-full", {
-                              'bg-emerald-500': job.status === 'Offer',
-                              'bg-red-500': job.status === 'Rejected',
-                              'bg-indigo-500': job.status === 'Interviewing',
-                              'bg-amber-500': job.status === 'Technical',
-                              'bg-slate-400': job.status === 'Applied',
-                              'bg-zinc-500': job.status === 'Ghosted',
-                            })} />
-                            {job.status}
-                          </span>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex flex-wrap gap-1">
-                            {job.skills.slice(0, 3).map(skill => (
-                              <span key={skill} className={cn(
-                                "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight",
-                                theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
-                              )}>
-                                {skill}
+          {/* Desktop Table View */}
+          <div className={cn("hidden md:block overflow-hidden rounded-3xl", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className={cn(
+                    "text-[10px] uppercase tracking-[0.2em] font-bold border-b",
+                    theme === 'dark' ? "bg-white/2 text-slate-500 border-slate-800/50" : "bg-slate-50/50 text-slate-400 border-slate-200"
+                  )}>
+                    <th className="px-8 py-5">Corporate entity</th>
+                    <th className="px-8 py-5">current state</th>
+                    <th className="px-8 py-5">Stack & Skills</th>
+                    <th className="px-8 py-5">Last Cycle</th>
+                    <th className="px-8 py-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className={cn("divide-y", theme === 'dark' ? "divide-slate-800/50" : "divide-slate-100")}>
+                  <AnimatePresence mode="popLayout">
+                    {filteredJobs.length > 0 ? filteredJobs.map((job) => {
+                      const staleLevel = getStaleLevel(job.updatedAt);
+                      return (
+                        <motion.tr 
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          key={job.id} 
+                          onClick={() => openEditModal(job)}
+                          className={cn(
+                            "transition-all group cursor-pointer relative",
+                            theme === 'dark' ? "hover:bg-indigo-500/3" : "hover:bg-indigo-50",
+                            staleLevel === 'critical' && theme === 'dark' ? "shadow-[inset_4px_0_0_#ef4444]" : staleLevel === 'critical' ? "shadow-[inset_4px_0_0_#ef4444] bg-red-50/30" : "",
+                            staleLevel === 'warning' && theme === 'dark' ? "shadow-[inset_4px_0_0_#f59e0b]" : staleLevel === 'warning' ? "shadow-[inset_4px_0_0_#f59e0b] bg-amber-50/30" : ""
+                          )}
+                        >
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col">
+                              <span className={cn("font-bold mb-0.5 group-hover:text-indigo-500 transition-colors uppercase tracking-tight", theme === 'dark' ? "text-slate-100" : "text-slate-900")}>
+                                {job.company}
                               </span>
-                            ))}
-                            {job.skills.length > 3 && (
-                                <span className="text-[9px] text-slate-500 font-bold">+{job.skills.length - 3}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
-                              {formatDistanceToNow(parseISO(job.updatedAt))} ago
-                              {staleLevel !== 'none' && (
-                                <div className={cn(
-                                  "w-2 h-2 rounded-full animate-pulse",
-                                  staleLevel === 'critical' ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
-                                )} />
-                              )}
+                              <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 leading-none">
+                                {job.role}
+                                {job.contacts.length > 0 && (
+                                  <span className="flex items-center gap-0.5 text-indigo-400/70 border border-indigo-400/20 px-1 rounded">
+                                    <User size={8} /> {job.contacts.length}
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap inline-flex items-center gap-1.5",
+                              job.status === 'Offer' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                              job.status === 'Rejected' && "bg-red-500/10 text-red-500 border-red-500/20",
+                              job.status === 'Interviewing' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+                              job.status === 'Technical' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                              job.status === 'Applied' && "bg-slate-500/10 text-slate-400 border-slate-500/20",
+                              job.status === 'Ghosted' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+                            )}>
+                              <div className={cn("w-1.5 h-1.5 rounded-full", {
+                                'bg-emerald-500': job.status === 'Offer',
+                                'bg-red-500': job.status === 'Rejected',
+                                'bg-indigo-500': job.status === 'Interviewing',
+                                'bg-amber-500': job.status === 'Technical',
+                                'bg-slate-400': job.status === 'Applied',
+                                'bg-zinc-500': job.status === 'Ghosted',
+                              })} />
+                              {job.status}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-6 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditModal(job);
-                              }}
-                              className={cn(
-                                "p-2 rounded-lg transition-all",
-                                theme === 'dark' ? "hover:bg-white/10 text-slate-400 hover:text-white" : "hover:bg-slate-100 text-slate-400 hover:text-slate-900"
-                              )}>
-                              <Eye size={18} />
-                            </button>
-                            {job.link && job.link !== '#' && (
-                              <a 
-                                href={job.link} 
-                                onClick={(e) => e.stopPropagation()}
-                                target="_blank" 
-                                rel="noopener noreferrer" 
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-wrap gap-1">
+                              {job.skills.slice(0, 3).map(skill => (
+                                <span key={skill} className={cn(
+                                  "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight",
+                                  theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                                )}>
+                                  {skill}
+                                </span>
+                              ))}
+                              {job.skills.length > 3 && (
+                                  <span className="text-[9px] text-slate-500 font-bold">+{job.skills.length - 3}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
+                                {formatDistanceToNow(parseISO(job.updatedAt))} ago
+                                {staleLevel !== 'none' && (
+                                  <div className={cn(
+                                    "w-2 h-2 rounded-full animate-pulse",
+                                    staleLevel === 'critical' ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
+                                  )} />
+                                )}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(job);
+                                }}
                                 className={cn(
                                   "p-2 rounded-lg transition-all",
                                   theme === 'dark' ? "hover:bg-white/10 text-slate-400 hover:text-white" : "hover:bg-slate-100 text-slate-400 hover:text-slate-900"
                                 )}>
-                                <ExternalLink size={18} />
-                              </a>
-                            )}
+                                <Eye size={18} />
+                              </button>
+                              {job.link && job.link !== '#' && (
+                                <a 
+                                  href={job.link} 
+                                  onClick={(e) => e.stopPropagation()}
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    theme === 'dark' ? "hover:bg-white/10 text-slate-400 hover:text-white" : "hover:bg-slate-100 text-slate-400 hover:text-slate-900"
+                                  )}>
+                                  <ExternalLink size={18} />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    }) : (
+                      <tr>
+                        <td colSpan={5} className="px-8 py-20 text-center">
+                          <div className="flex flex-col items-center gap-6">
+                            <Briefcase size={64} className="text-indigo-500 opacity-30" />
+                            <div className="space-y-2">
+                              <h3 className="text-xl font-bold tracking-tight">Your Career Pipeline is Empty</h3>
+                              <p className="text-sm text-slate-500 max-w-md">
+                                Start tracking your job applications by adding your first entry. All dashboard analytics and charts will automatically activate once you have applications recorded.
+                              </p>
+                            </div>
+                            <button 
+                              onClick={openAddModal}
+                              className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl flex items-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-4"
+                            >
+                              <Plus size={18} /> Add Your First Application
+                            </button>
                           </div>
                         </td>
-                      </motion.tr>
-                    );
-                  }) : (
-                    <tr>
-                      <td colSpan={5} className="px-8 py-20 text-center">
-                        <div className="flex flex-col items-center gap-6">
-                          <Briefcase size={64} className="text-indigo-500 opacity-30" />
-                          <div className="space-y-2">
-                            <h3 className="text-xl font-bold tracking-tight">Your Career Pipeline is Empty</h3>
-                            <p className="text-sm text-slate-500 max-w-md">
-                              Start tracking your job applications by adding your first entry. All dashboard analytics and charts will automatically activate once you have applications recorded.
-                            </p>
-                          </div>
-                          <button 
-                            onClick={openAddModal}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl flex items-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-4"
-                          >
-                            <Plus size={18} /> Add Your First Application
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </AnimatePresence>
-              </tbody>
-            </table>
+                      </tr>
+                    )}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
+            <AnimatePresence mode="popLayout">
+              {filteredJobs.length > 0 ? filteredJobs.map((job) => {
+                const staleLevel = getStaleLevel(job.updatedAt);
+                return (
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    key={job.id}
+                    onClick={() => openEditModal(job)}
+                    className={cn(
+                      "p-5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group",
+                      theme === 'dark' ? "bg-[#18181b] border-slate-800 hover:border-indigo-500/50" : "bg-white border-slate-200 hover:border-indigo-500/50 shadow-sm",
+                      staleLevel === 'critical' && theme === 'dark' ? "shadow-[inset_4px_0_0_#ef4444]" : staleLevel === 'critical' ? "shadow-[inset_4px_0_0_#ef4444] bg-red-50/30" : "",
+                      staleLevel === 'warning' && theme === 'dark' ? "shadow-[inset_4px_0_0_#f59e0b]" : staleLevel === 'warning' ? "shadow-[inset_4px_0_0_#f59e0b] bg-amber-50/30" : ""
+                    )}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className={cn("font-bold text-lg leading-tight mb-1 uppercase tracking-tight", theme === 'dark' ? "text-slate-100" : "text-slate-900")}>
+                          {job.company}
+                        </h4>
+                        <span className="text-xs text-slate-500 font-mono flex items-center gap-1.5">
+                          {job.role}
+                          {job.contacts.length > 0 && (
+                            <span className="flex items-center gap-0.5 text-indigo-400/70 border border-indigo-400/20 px-1 rounded">
+                              <User size={8} /> {job.contacts.length}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap inline-flex items-center gap-1.5",
+                        job.status === 'Offer' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                        job.status === 'Rejected' && "bg-red-500/10 text-red-500 border-red-500/20",
+                        job.status === 'Interviewing' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+                        job.status === 'Technical' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                        job.status === 'Applied' && "bg-slate-500/10 text-slate-400 border-slate-500/20",
+                        job.status === 'Ghosted' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+                      )}>
+                        <div className={cn("w-1.5 h-1.5 rounded-full", {
+                          'bg-emerald-500': job.status === 'Offer',
+                          'bg-red-500': job.status === 'Rejected',
+                          'bg-indigo-500': job.status === 'Interviewing',
+                          'bg-amber-500': job.status === 'Technical',
+                          'bg-slate-400': job.status === 'Applied',
+                          'bg-zinc-500': job.status === 'Ghosted',
+                        })} />
+                        {job.status}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 mb-4">
+                      {job.skills.slice(0, 4).map(skill => (
+                        <span key={skill} className={cn(
+                          "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight",
+                          theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                        )}>
+                          {skill}
+                        </span>
+                      ))}
+                      {job.skills.length > 4 && (
+                          <span className="text-[9px] text-slate-500 font-bold self-center">+{job.skills.length - 4}</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-500/10">
+                      <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
+                        <Clock size={12} />
+                        {formatDistanceToNow(parseISO(job.updatedAt))} ago
+                        {staleLevel !== 'none' && (
+                          <div className={cn(
+                            "w-2 h-2 rounded-full animate-pulse",
+                            staleLevel === 'critical' ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
+                          )} />
+                        )}
+                      </span>
+                      
+                      {job.link && job.link !== '#' && (
+                        <a 
+                          href={job.link} 
+                          onClick={(e) => e.stopPropagation()}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className={cn(
+                            "p-2 rounded-lg transition-all",
+                            theme === 'dark' ? "bg-white/5 text-slate-400 hover:text-white" : "bg-slate-100 text-slate-500 hover:text-slate-900"
+                          )}>
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              }) : (
+                <div className="col-span-full py-16 text-center border-2 border-dashed rounded-3xl border-slate-500/20">
+                  <div className="flex flex-col items-center gap-4">
+                    <Briefcase size={48} className="text-indigo-500 opacity-30" />
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold tracking-tight">Pipeline is Empty</h3>
+                      <p className="text-xs text-slate-500">Start tracking your job applications.</p>
+                    </div>
+                    <button 
+                      onClick={openAddModal}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all text-xs font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-2"
+                    >
+                      <Plus size={16} /> Add First Application
+                    </button>
+                  </div>
+                </div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       </div>
