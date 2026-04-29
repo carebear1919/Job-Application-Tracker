@@ -12,7 +12,7 @@ type JobStatus = 'Applied' | 'Interviewing' | 'Technical' | 'Offer' | 'Rejected'
 interface StatusBreakdownDonutProps {
   jobs: any[];
   theme: 'dark' | 'light';
-  colors?: Record<JobStatus, string>;
+  colors?: Record<string, string>;
 }
 
 const DEFAULT_STATUS_COLORS: Record<JobStatus, string> = {
@@ -24,7 +24,13 @@ const DEFAULT_STATUS_COLORS: Record<JobStatus, string> = {
   Ghosted: '#71717a',
 };
 
-const CustomStatusTooltip = ({ active, payload, theme }: any) => {
+interface CustomStatusTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; fill: string; payload: { percentage: number } }>;
+  theme: 'dark' | 'light';
+}
+
+const CustomStatusTooltip = ({ active, payload, theme }: CustomStatusTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className={cn(

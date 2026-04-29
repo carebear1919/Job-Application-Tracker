@@ -21,9 +21,16 @@ interface FunnelData {
   name: string;
   value: number;
   fill: string;
+  percentage: number;
 }
 
-const CustomFunnelTooltip = ({ active, payload, theme }: any) => {
+interface CustomFunnelTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; value: number; percentage: number } }>;
+  theme: 'dark' | 'light';
+}
+
+const CustomFunnelTooltip = ({ active, payload, theme }: CustomFunnelTooltipProps) => {
   if (active && payload && payload[0]) {
     const data = payload[0].payload;
     const percentage = data.percentage || 0;

@@ -13,7 +13,13 @@ interface WeeklyVolumeChartProps {
   theme: 'dark' | 'light';
 }
 
-const CustomWeeklyTooltip = ({ active, payload, theme }: any) => {
+interface CustomWeeklyTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { weekRange: string }; value: number }>;
+  theme: 'dark' | 'light';
+}
+
+const CustomWeeklyTooltip = ({ active, payload, theme }: CustomWeeklyTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className={cn(

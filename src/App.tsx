@@ -79,9 +79,27 @@ const COMMON_SKILLS = [
   'UI Design', 'Figma', 'System Design', 'Testing'
 ].sort();
 
+// --- Type Interfaces ---
+
+interface StatCardProps {
+  label: string;
+  value: number | string;
+  icon: React.ReactElement;
+  trend?: string;
+  colorVar: string;
+  delay: number;
+  theme: 'dark' | 'light';
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number }>;
+  theme: 'dark' | 'light';
+}
+
 // --- Components ---
 
-const StatCard = ({ label, value, icon, trend, colorVar, delay, theme }: any) => (
+const StatCard = ({ label, value, icon, trend, colorVar, delay, theme }: StatCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -108,12 +126,12 @@ const StatCard = ({ label, value, icon, trend, colorVar, delay, theme }: any) =>
         color: `var(${colorVar})`
       }}
     >
-      {React.cloneElement(icon, { size: 24, className: "text-inherit" })}
+      {React.cloneElement(icon, { size: 24, className: "text-inherit" } as any)}
     </div>
   </motion.div>
 );
 
-const CustomTooltip = ({ active, payload, theme }: any) => {
+const CustomTooltip = ({ active, payload, theme }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className={cn(
@@ -134,13 +152,13 @@ const CustomTooltip = ({ active, payload, theme }: any) => {
 
 export default function App() {
   const [jobs, setJobs] = useLocalStorage<Job[]>('job_applications', INITIAL_JOBS);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<JobStatus | 'All'>('All');
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [search, setSearch] = useLocalStorage<string>('job_search_query', '');
+  const [statusFilter, setStatusFilter] = useLocalStorage<JobStatus | 'All'>('job_status_filter', 'All');
+  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('app_theme', 'dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'default' | 'interview'>('default');
+  const [viewMode, setViewMode] = useLocalStorage<'default' | 'interview'>('job_view_mode', 'default');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>('has_seen_welcome', false);
@@ -204,7 +222,7 @@ export default function App() {
     setShowWelcome(true);
   };
 
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  const toggleTheme = () => setTheme((prev: 'dark' | 'light') => prev === 'dark' ? 'light' : 'dark');
 
   // Shortcut for Ctrl+K
   useEffect(() => {
@@ -247,7 +265,7 @@ export default function App() {
   };
 
   const handleDeleteJob = (id: string) => {
-    setJobs(prev => prev.filter(j => j.id !== id));
+    setJobs((prev: Job[]) => prev.filter((j: Job) => j.id !== id));
     setIsModalOpen(false);
   };
 
@@ -288,7 +306,7 @@ export default function App() {
     const timestamp = new Date().toISOString().split('T')[0];
 
     if (selectedJob) {
-      setJobs(prev => prev.map(j => j.id === selectedJob.id ? { 
+      setJobs((prev: Job[]) => prev.map((j: Job) => j.id === selectedJob.id ? { 
         ...j, 
         ...jobForm, 
         source: sourceInput,
@@ -309,7 +327,7 @@ export default function App() {
         contacts: jobForm.contacts || [],
         notes: jobForm.notes || ''
       };
-      setJobs(prev => [job, ...prev]);
+      setJobs((prev: Job[]) => [job, ...prev]);
     }
     
     setIsModalOpen(false);
@@ -450,7 +468,7 @@ export default function App() {
               onClose={() => setIsSettingsOpen(false)}
               theme={theme}
               colors={colors}
-              onColorChange={updateColor}
+              onColorChange={(key: string, value: string) => updateColor(key as any, value)}
               onResetTheme={resetColors}
               jobs={jobs}
               kpis={kpis}
@@ -532,7 +550,7 @@ export default function App() {
                 <LayoutDashboard size={14} className="text-indigo-500" />
                 Status Breakdown
               </h3>
-              <StatusBreakdownDonut jobs={jobs} theme={theme} colors={colors} />
+              <StatusBreakdownDonut jobs={jobs} theme={theme} colors={colors as any} />
             </div>
           </motion.div>
         </div>
@@ -1411,7 +1429,7 @@ export default function App() {
 
                 <div className="space-y-3 pt-4">
                   <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
                       <Briefcase size={18} />
                     </div>
                     <div>
@@ -1421,7 +1439,7 @@ export default function App() {
                   </div>
                   
                   <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
                       <LayoutDashboard size={18} />
                     </div>
                     <div>
@@ -1431,7 +1449,7 @@ export default function App() {
                   </div>
                   
                   <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
                       <Clock size={18} />
                     </div>
                     <div>
