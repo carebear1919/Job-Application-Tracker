@@ -162,6 +162,8 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>('has_seen_welcome', false);
   const [showCharts, setShowCharts] = useLocalStorage<boolean>('show_analytics_charts', false);
+  const [expandedQA, setExpandedQA] = useState<Record<number, boolean>>({});
+  const [showLearnMore, setShowLearnMore] = useState(false);
 
   // Theme Customization Hook
   const { colors, updateColor, resetColors } = useThemeCustomization();
@@ -181,6 +183,7 @@ export default function App() {
   const [sourceInput, setSourceInput] = useState("");
   const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
   const [skillInput, setSkillInput] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Show welcome modal on first visit
   useEffect(() => {
@@ -299,9 +302,35 @@ export default function App() {
     });
   };
 
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    if (!jobForm.company?.trim()) {
+      errors.company = 'Company name is required';
+    }
+    if (!jobForm.role?.trim()) {
+      errors.role = 'Target role is required';
+    }
+    if (jobForm.link && jobForm.link !== '#' && jobForm.link?.trim() && !isValidUrl(jobForm.link)) {
+      errors.link = 'Please enter a valid URL (e.g., https://example.com)';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jobForm.company || !jobForm.role) return;
+    if (!validateForm()) return;
 
     const timestamp = new Date().toISOString().split('T')[0];
 
@@ -676,7 +705,7 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.1 }}
           className="w-full"
         >
           {/* Desktop Table View */}
@@ -696,15 +725,15 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className={cn("divide-y", theme === 'dark' ? "divide-slate-800/50" : "divide-slate-100")}>
-                  <AnimatePresence mode="popLayout">
+                  <AnimatePresence mode="wait">
                     {filteredJobs.length > 0 ? filteredJobs.map((job) => {
                       const staleLevel = getStaleLevel(job.updatedAt);
                       return (
                         <motion.tr 
-                          layout
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.15 }}
                           key={job.id} 
                           onClick={() => openEditModal(job)}
                           className={cn(
@@ -814,17 +843,30 @@ export default function App() {
                           <div className="flex flex-col items-center gap-6">
                             <Briefcase size={64} className="text-indigo-500 opacity-30" />
                             <div className="space-y-2">
-                              <h3 className="text-xl font-bold tracking-tight">Your Career Pipeline is Empty</h3>
-                              <p className="text-sm text-slate-500 max-w-md">
-                                Start tracking your job applications by adding your first entry. All dashboard analytics and charts will automatically activate once you have applications recorded.
-                              </p>
+                              {jobs.length === 0 ? (
+                                <>
+                                  <h3 className="text-xl font-bold tracking-tight">Your Career Pipeline is Empty</h3>
+                                  <p className="text-sm text-slate-500 max-w-md">
+                                    Start tracking your job applications by adding your first entry. All dashboard analytics and charts will automatically activate once you have applications recorded.
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <h3 className="text-xl font-bold tracking-tight">No Applications Found</h3>
+                                  <p className="text-sm text-slate-500 max-w-md">
+                                    No applications match the current filters. Try adjusting your status filter or search query.
+                                  </p>
+                                </>
+                              )}
                             </div>
-                            <button 
-                              onClick={openAddModal}
-                              className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl flex items-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-4"
-                            >
-                              <Plus size={18} /> Add Your First Application
-                            </button>
+                            {jobs.length === 0 && (
+                              <button 
+                                onClick={openAddModal}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl flex items-center gap-2 transition-all text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-4"
+                              >
+                                <Plus size={18} /> Add Your First Application
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -837,15 +879,15 @@ export default function App() {
 
           {/* Mobile Card View */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="wait">
               {filteredJobs.length > 0 ? filteredJobs.map((job) => {
                 const staleLevel = getStaleLevel(job.updatedAt);
                 return (
                   <motion.div
-                    layout
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
                     key={job.id}
                     onClick={() => openEditModal(job)}
                     className={cn(
@@ -937,15 +979,26 @@ export default function App() {
                   <div className="flex flex-col items-center gap-4">
                     <Briefcase size={48} className="text-indigo-500 opacity-30" />
                     <div className="space-y-1">
-                      <h3 className="text-lg font-bold tracking-tight">Pipeline is Empty</h3>
-                      <p className="text-xs text-slate-500">Start tracking your job applications.</p>
+                      {jobs.length === 0 ? (
+                        <>
+                          <h3 className="text-lg font-bold tracking-tight">Your Career Pipeline is Empty</h3>
+                          <p className="text-xs text-slate-500">Start tracking your job applications.</p>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="text-lg font-bold tracking-tight">No Applications Found</h3>
+                          <p className="text-xs text-slate-500">Try adjusting your filters.</p>
+                        </>
+                      )}
                     </div>
-                    <button 
-                      onClick={openAddModal}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all text-xs font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-2"
-                    >
-                      <Plus size={16} /> Add First Application
-                    </button>
+                    {jobs.length === 0 && (
+                      <button 
+                        onClick={openAddModal}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all text-xs font-bold shadow-lg shadow-indigo-600/20 active:scale-95 uppercase tracking-widest mt-2"
+                      >
+                        <Plus size={16} /> Add First Application
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1044,67 +1097,78 @@ export default function App() {
                 theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200"
               )}
             >
-              <div className="flex flex-col lg:flex-row min-h-150">
+              <div className="flex flex-col min-h-150">
                 
                 {/* Modal Sidebar */}
                 <div className={cn(
-                  "w-full lg:w-72 p-10 border-b lg:border-b-0 lg:border-r shrink-0",
+                  "w-full px-10 py-6 border-b shrink-0",
                   theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50/50 border-slate-100"
                 )}>
-                  <div className="mb-10 text-center lg:text-left">
-                    <div className="flex justify-center lg:justify-start mb-4">
-                      <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30">
-                        <Briefcase size={32} />
+                  <div className="flex items-start justify-between mb-8">
+                    <div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30">
+                          <Briefcase size={24} />
+                        </div>
+                        <div>
+                          <h2 className={cn("text-xl font-bold tracking-tighter uppercase", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                              {jobForm.company || "CORPORATE"}
+                          </h2>
+                          <p className="text-indigo-500 font-bold text-xs uppercase tracking-widest">{jobForm.role || "POSITION"}</p>
+                        </div>
                       </div>
                     </div>
-                    <h2 className={cn("text-2xl font-bold tracking-tighter uppercase mb-1", theme === 'dark' ? "text-white" : "text-slate-900")}>
-                        {jobForm.company || "CORPORATE"}
-                    </h2>
-                    <p className="text-indigo-500 font-bold text-xs uppercase tracking-widest">{jobForm.role || "POSITION"}</p>
+                    <button 
+                      onClick={() => setIsModalOpen(false)}
+                      aria-label="Close modal"
+                      className={cn(
+                        "p-2.5 rounded-xl transition-all shrink-0",
+                        theme === 'dark' ? "bg-white/5 border border-white/10 text-slate-500 hover:text-white" : "bg-slate-100 text-slate-400 hover:text-slate-900"
+                      )}
+                    >
+                      <X size={18} />
+                    </button>
                   </div>
 
-                  <nav className="space-y-1">
+                  <nav className="flex gap-1.5 mb-4">
                     <button 
                       onClick={() => setViewMode('default')}
                       className={cn(
-                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
+                        "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
                         viewMode === 'default' 
                           ? (theme === 'dark' ? "bg-white/10 text-white" : "bg-white shadow-sm text-indigo-600 border border-slate-200")
                           : "text-slate-500 hover:text-slate-300"
                       )}
                     >
-                      <LayoutDashboard size={14} /> Pipeline Data
+                      <LayoutDashboard size={13} /> Application Details
                     </button>
                     <button 
                       onClick={() => setViewMode('interview')}
                       className={cn(
-                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
+                        "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
                         viewMode === 'interview' 
                           ? "bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-lg shadow-amber-500/5" 
                           : "text-slate-500 hover:text-amber-500/60"
                       )}
                     >
-                      <Terminal size={14} /> intelligence Hub
+                      <AlertCircle size={13} /> Notes & Contacts
                     </button>
                   </nav>
 
                   {selectedJob && (
-                    <div className={cn("mt-10 pt-10 border-t", theme === 'dark' ? "border-slate-800" : "border-slate-200")}>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Lifecycle telemetry</p>
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <Calendar size={14} className="text-slate-600" />
-                          <div className="leading-none">
-                            <p className="text-[10px] text-slate-500 mb-0.5 font-bold uppercase">Applied</p>
-                            <p className={cn("text-xs font-bold font-mono", theme === 'dark' ? "text-slate-300" : "text-slate-700")}>{selectedJob.date}</p>
-                          </div>
+                    <div className={cn("flex gap-6 text-[9px] border-t pt-4", theme === 'dark' ? "border-slate-800" : "border-slate-200")}>
+                      <div className="flex items-center gap-1.5">
+                        <Calendar size={12} className="text-slate-500" />
+                        <div>
+                          <p className="text-slate-600 font-bold uppercase">Applied</p>
+                          <p className={cn("font-bold font-mono text-[8px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{selectedJob.date}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Clock size={14} className="text-slate-600" />
-                          <div className="leading-none">
-                            <p className="text-[10px] text-slate-500 mb-0.5 font-bold uppercase">Last Sync</p>
-                            <p className={cn("text-xs font-bold font-mono", theme === 'dark' ? "text-slate-300" : "text-slate-700")}>{formatDistanceToNow(parseISO(selectedJob.updatedAt))} ago</p>
-                          </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={12} className="text-slate-500" />
+                        <div>
+                          <p className="text-slate-600 font-bold uppercase">Last Sync</p>
+                          <p className={cn("font-bold font-mono text-[8px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{formatDistanceToNow(parseISO(selectedJob.updatedAt))} ago</p>
                         </div>
                       </div>
                     </div>
@@ -1112,57 +1176,59 @@ export default function App() {
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 p-8 md:p-12 overflow-y-auto">
-                  <div className="flex items-center justify-between mb-10">
-                    <h3 className={cn("text-lg font-bold uppercase tracking-[0.3em] flex items-center gap-2", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>
-                      {viewMode === 'default' ? (selectedJob ? 'Sync application' : 'Initialize Propect') : 'Intelligence hub'}
+                <div className="flex-1 p-8 md:p-10 overflow-y-auto">
+                  <div className="mb-6">
+                    <h3 className={cn("text-lg font-bold uppercase tracking-[0.3em]", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>
+                      {viewMode === 'default' ? (selectedJob ? 'Update Application' : 'Add New Application') : 'Notes & Contacts'}
                     </h3>
-                    <button 
-                      onClick={() => setIsModalOpen(false)}
-                      aria-label="Close modal"
-                      className={cn(
-                        "p-2.5 rounded-xl transition-all",
-                        theme === 'dark' ? "bg-white/5 border border-white/10 text-slate-500 hover:text-white" : "bg-slate-100 text-slate-400 hover:text-slate-900"
-                      )}
-                    >
-                      <X size={20} />
-                    </button>
                   </div>
 
                   {viewMode === 'default' ? (
-                    <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl mx-auto lg:mx-0">
+                    <form onSubmit={handleSubmit} className="space-y-8 w-full">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Organization</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Company Name *</label>
                           <input 
                             required
                             type="text" 
+                            placeholder="e.g., Google, Meta, Startup Inc."
                             className={cn(
                                 "input-base text-lg font-bold",
+                                formErrors.company ? "ring-2 ring-red-500/50" : "",
                                 theme === 'dark' ? "bg-zinc-900/50" : "bg-slate-50"
                             )}
                             value={jobForm.company || ''}
-                            onChange={(e) => setJobForm({...jobForm, company: e.target.value})}
+                            onChange={(e) => {
+                              setJobForm({...jobForm, company: e.target.value});
+                              if (formErrors.company) setFormErrors({...formErrors, company: ''});
+                            }}
                           />
+                          {formErrors.company && <p className="text-xs text-red-500 font-bold px-1">{formErrors.company}</p>}
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Target Role</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Job Title / Position *</label>
                           <input 
                             required
                             type="text" 
+                            placeholder="e.g., Senior Frontend Engineer"
                             className={cn(
                                 "input-base text-lg font-bold",
+                                formErrors.role ? "ring-2 ring-red-500/50" : "",
                                 theme === 'dark' ? "bg-zinc-900/50" : "bg-slate-50"
                             )}
                             value={jobForm.role || ''}
-                            onChange={(e) => setJobForm({...jobForm, role: e.target.value})}
+                            onChange={(e) => {
+                              setJobForm({...jobForm, role: e.target.value});
+                              if (formErrors.role) setFormErrors({...formErrors, role: ''});
+                            }}
                           />
+                          {formErrors.role && <p className="text-xs text-red-500 font-bold px-1">{formErrors.role}</p>}
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Pipeline state</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Current Status</label>
                           <select 
                             className={cn(
                                 "input-base font-bold",
@@ -1177,7 +1243,7 @@ export default function App() {
                           </select>
                         </div>
                         <div className="space-y-2 relative">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Channel source</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Where You Found It</label>
                           <input 
                             type="text" 
                             className={cn(
@@ -1203,22 +1269,27 @@ export default function App() {
                           )}
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Link URL</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Job Posting URL</label>
                           <input 
-                             type="url"
-                             placeholder="https://..."
+                             type="text"
+                             placeholder="https://example.com/careers/job"
                              className={cn(
                                 "input-base font-mono text-[10px]",
+                                formErrors.link ? "ring-2 ring-red-500/50" : "",
                                 theme === 'dark' ? "bg-zinc-900/50" : "bg-slate-50"
                              )}
                              value={jobForm.link || ''}
-                             onChange={(e) => setJobForm({...jobForm, link: e.target.value})}
+                             onChange={(e) => {
+                               setJobForm({...jobForm, link: e.target.value});
+                               if (formErrors.link) setFormErrors({...formErrors, link: ''});
+                             }}
                           />
+                          {formErrors.link && <p className="text-xs text-red-500 font-bold px-1">{formErrors.link}</p>}
                         </div>
                       </div>
 
                       <div className="space-y-4">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Tech stack & Skills</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Required Technologies & Skills</label>
                         <div className={cn(
                                 "flex flex-wrap gap-2 p-2 rounded-2xl border min-h-15",
                                 theme === 'dark' ? "bg-white/2 border-slate-800/50" : "bg-slate-50 border-slate-200"
@@ -1231,7 +1302,7 @@ export default function App() {
                           ))}
                           <div className="relative flex-1">
                             <input 
-                              placeholder="Type tag and press enter..."
+                              placeholder="React, TypeScript, AWS... (Press Enter)"
                               className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full py-1 placeholder:text-slate-600 h-10 px-3"
                               value={skillInput}
                               onChange={(e) => setSkillInput(e.target.value)}
@@ -1269,14 +1340,14 @@ export default function App() {
                             onClick={() => handleDeleteJob(selectedJob.id)}
                             className="px-8 py-4 rounded-2xl border border-red-500/20 text-red-500 font-bold text-[10px] hover:bg-red-500/10 transition-all uppercase tracking-[0.2em]"
                           >
-                            Purge Entry
+                            Delete Entry
                           </button>
                         )}
                         <button 
                           type="submit"
                           className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/20 active:scale-[0.98] uppercase tracking-[0.2em]"
                         >
-                          <Send size={18} /> {selectedJob ? 'Sync Changes' : 'Initialize Prospect'}
+                          <Send size={18} /> Save Application
                         </button>
                       </div>
                     </form>
@@ -1290,7 +1361,7 @@ export default function App() {
                         <section>
                           <div className="flex items-center gap-2 mb-6 uppercase tracking-widest text-[10px] font-bold text-slate-500">
                             <User size={14} className="text-indigo-400" />
-                            Relational Contacts
+                            Contacts & Recruiters
                           </div>
                           <div className={cn("rounded-3xl border p-4 space-y-3", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50/50 border-slate-200")}>
                             {jobForm.contacts && jobForm.contacts.length > 0 ? jobForm.contacts.map((contact, i) => (
@@ -1341,7 +1412,7 @@ export default function App() {
                         <section>
                           <div className="flex items-center gap-2 mb-6 uppercase tracking-widest text-[10px] font-bold text-slate-500">
                             <FileText size={14} className="text-indigo-400" />
-                            Application Materials
+                            Resume & Cover Letter
                           </div>
                           <div className="space-y-3">
                             <div className={cn("p-4 rounded-2xl border flex items-center justify-between transition-all hover:border-indigo-500/50", theme === 'dark' ? "bg-white/2 border-slate-8000" : "bg-white border-slate-200")}>
@@ -1366,7 +1437,7 @@ export default function App() {
                       <section>
                         <div className="flex items-center gap-2 mb-4 uppercase tracking-widest text-[10px] font-bold text-slate-500">
                           <AlertCircle size={14} className="text-indigo-400" />
-                          Strategic Intelligence Notes
+                          Interview Notes & Research
                         </div>
                         <div className="relative">
                             <textarea 
@@ -1374,7 +1445,7 @@ export default function App() {
                                 "w-full h-48 p-8 rounded-4xl border outline-none font-mono text-xs leading-relaxed transition-all",
                                 theme === 'dark' ? "bg-white/1 border-slate-800 text-indigo-300/80 focus:border-indigo-500/50 shadow-inner" : "bg-slate-50/50 border-slate-200 text-slate-600 focus:border-indigo-500/30"
                             )}
-                            placeholder="Log company intelligence, cultural fit details, or technical interview questions..."
+                            placeholder="Interview questions to prepare for • Cultural fit notes • Company research insights • Salary expectations • Follow-up reminders..."
                             value={jobForm.notes || ''}
                             onChange={(e) => setJobForm({...jobForm, notes: e.target.value})}
                             />
@@ -1384,6 +1455,40 @@ export default function App() {
                             </div>
                         </div>
                       </section>
+
+                      <div className="flex gap-4 pt-10 border-t border-slate-800/50">
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (selectedJob) {
+                              setJobForm({
+                                ...jobForm,
+                                status: selectedJob.status,
+                                date: selectedJob.date,
+                                company: selectedJob.company,
+                                role: selectedJob.role,
+                                salary: selectedJob.salary,
+                                link: selectedJob.link,
+                                skills: selectedJob.skills,
+                                contacts: jobForm.contacts,
+                                notes: jobForm.notes,
+                                resumeUrl: selectedJob.resumeUrl,
+                                coverLetterUrl: selectedJob.coverLetterUrl,
+                              });
+                              const timestamp = new Date().toISOString().split('T')[0];
+                              setJobs((prev: Job[]) => prev.map((j: Job) => j.id === selectedJob.id ? { 
+                                ...j, 
+                                ...jobForm, 
+                                source: sourceInput || j.source,
+                                updatedAt: timestamp 
+                              } as Job : j));
+                              setIsModalOpen(false);
+                            }
+                          }}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/20 active:scale-[0.98] uppercase tracking-[0.2em]"
+                        >
+                          <Send size={18} /> Save Notes & Contacts
+                        </button>                     </div>
 
                     </motion.div>
                   )}
@@ -1412,71 +1517,246 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
               className={cn(
-                "w-full max-w-lg relative z-10 rounded-3xl shadow-2xl p-10 pointer-events-auto border",
+                "w-full max-w-2xl relative z-10 rounded-3xl shadow-2xl pointer-events-auto border flex flex-col max-h-[90vh]",
                 theme === 'dark' ? "bg-[#09090b] border-slate-800" : "bg-white border-slate-200"
               )}
             >
-              <div className="text-center space-y-6">
-                <div className="w-20 h-20 rounded-2xl bg-indigo-600 mx-auto flex items-center justify-center shadow-xl shadow-indigo-600/30">
-                  <Target size={40} className="text-white" />
+              <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                {/* Welcome Section */}
+                <div className="text-center space-y-6">
+                  <div className="w-20 h-20 rounded-2xl bg-indigo-600 mx-auto flex items-center justify-center shadow-xl shadow-indigo-600/30">
+                    <Target size={40} className="text-white" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold tracking-tighter uppercase">Welcome to Career Pipeline</h2>
+                    <p className={cn("text-sm max-w-sm mx-auto", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>
+                      Track all your job applications in one place. Visualize your progress, identify bottlenecks, and land your next role faster.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 pt-4">
+                    <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5 border border-white/10" : "bg-slate-50 border border-slate-200")}>
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0", "bg-indigo-600")}>
+                        <Briefcase size={18} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">Track Applications</p>
+                        <p className={cn("text-xs", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>Log every opportunity with full details</p>
+                      </div>
+                    </div>
+                    
+                    <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5 border border-white/10" : "bg-slate-50 border border-slate-200")}>
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0", "bg-indigo-600")}>
+                        <LayoutDashboard size={18} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">Analytics Dashboard</p>
+                        <p className={cn("text-xs", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>See your conversion rates at a glance</p>
+                      </div>
+                    </div>
+                    
+                    <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5 border border-white/10" : "bg-slate-50 border border-slate-200")}>
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0", "bg-indigo-600")}>
+                        <Clock size={18} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">Follow Up Reminders</p>
+                        <p className={cn("text-xs", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>Never miss an opportunity again</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Learn More Button & Q&A Section */}
+              <div className="border-t" style={{ borderColor: theme === 'dark' ? '#27272a' : '#e2e8f0' }}>
+                <div className="p-8 pb-4">
+                  <button
+                    onClick={() => setShowLearnMore(!showLearnMore)}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className={cn("font-bold text-sm uppercase tracking-wider", theme === 'dark' ? "text-slate-300" : "text-slate-700")}>
+                          Learn More
+                        </h3>
+                        <p className={cn("text-xs mt-1", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>
+                          Get answers to common questions about using the tracker
+                        </p>
+                      </div>
+                      <ChevronRight size={18} className={cn("transition-transform shrink-0 mt-0.5", showLearnMore && "rotate-90")} />
+                    </div>
+                  </button>
                 </div>
                 
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-bold tracking-tighter uppercase">Welcome to Career Pipeline</h2>
-                  <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                    Track all your job applications in one place. Visualize your progress, identify bottlenecks, and land your next role faster.
-                  </p>
-                </div>
+                {/* Q&A Scrollable Section */}
+                {showLearnMore && (
+                <div className="max-h-[35vh] overflow-y-auto px-8 space-y-3 pb-4">
 
-                <div className="space-y-3 pt-4">
-                  <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
-                      <Briefcase size={18} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm">Track Applications</p>
-                      <p className="text-xs text-slate-500">Log every opportunity with full details</p>
-                    </div>
-                  </div>
-                  
-                  <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
-                      <LayoutDashboard size={18} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm">Analytics Dashboard</p>
-                      <p className="text-xs text-slate-500">See your conversion rates at a glance</p>
-                    </div>
-                  </div>
-                  
-                  <div className={cn("flex items-center gap-4 p-4 rounded-2xl text-left", theme === 'dark' ? "bg-white/5" : "bg-slate-50")}>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
-                      <Clock size={18} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm">Follow Up Reminders</p>
-                      <p className="text-xs text-slate-500">Never miss an opportunity again</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 pt-4">
-                  <button 
-                    onClick={handleWelcomeStart}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/20 active:scale-[0.98] uppercase tracking-[0.2em]"
+                  {/* Q1 */}
+                  <button
+                    onClick={() => setExpandedQA({...expandedQA, 1: !expandedQA[1]})}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
                   >
-                    <Plus size={18} /> Add Your First Application
-                  </button>
-                  <button 
-                    onClick={handleWelcomeDismiss}
-                    className={cn(
-                      "w-full py-3 rounded-xl text-sm font-bold uppercase tracking-[0.2em] transition-all",
-                      theme === 'dark' ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-900"
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-indigo-500">
+                        <Briefcase size={16} /> Q1: How do I add a job application?
+                      </h4>
+                      <ChevronRight size={18} className={cn("transition-transform", expandedQA[1] && "rotate-90")} />
+                    </div>
+                    {expandedQA[1] && (
+                      <div className="mt-3 pt-3 border-t border-slate-300 dark:border-slate-700 space-y-2">
+                        <p className={cn("text-[11px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>Click <strong>"+ NEW ENTRY"</strong> in the top right corner to create a new application. Fill in:</p>
+                        <ul className={cn("text-[11px] space-y-1.5 ml-4", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>
+                          <li>✓ <strong>Company Name</strong> (required)</li>
+                          <li>✓ <strong>Job Title / Position</strong> (required)</li>
+                          <li>○ <strong>Current Status</strong> - Where you are in the process</li>
+                          <li>○ <strong>Where You Found It</strong> - LinkedIn, Indeed, etc.</li>
+                          <li>○ <strong>Job Posting URL</strong> - Link to the job listing (optional)</li>
+                          <li>○ <strong>Required Technologies & Skills</strong> - Type and press Enter</li>
+                        </ul>
+                      </div>
                     )}
+                  </button>
+
+                  {/* Q2 */}
+                  <button
+                    onClick={() => setExpandedQA({...expandedQA, 2: !expandedQA[2]})}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
                   >
-                    Explore First
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-amber-500">
+                        <Tag size={16} /> Q2: What do the application statuses mean?
+                      </h4>
+                      <ChevronRight size={18} className={cn("transition-transform", expandedQA[2] && "rotate-90")} />
+                    </div>
+                    {expandedQA[2] && (
+                      <div className="mt-3 pt-3 border-t border-slate-300 dark:border-slate-700 space-y-1.5 text-[11px]">
+                        <div className="flex gap-2"><span className="font-bold text-slate-400 bg-slate-500/10 px-2 py-1 rounded text-[9px]">APPLIED</span><span className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>You submitted your application</span></div>
+                        <div className="flex gap-2"><span className="font-bold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded text-[9px]">INTERVIEWING</span><span className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>First or ongoing interview rounds</span></div>
+                        <div className="flex gap-2"><span className="font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-[9px]">TECHNICAL</span><span className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Technical assessment or coding challenge</span></div>
+                        <div className="flex gap-2"><span className="font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded text-[9px]">OFFER</span><span className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Offer received 🎉</span></div>
+                        <div className="flex gap-2"><span className="font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded text-[9px]">REJECTED</span><span className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Application rejected</span></div>
+                        <div className="flex gap-2"><span className="font-bold text-zinc-400 bg-zinc-500/10 px-2 py-1 rounded text-[9px]">GHOSTED</span><span className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>No response after 30+ days</span></div>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Q3 */}
+                  <button
+                    onClick={() => setExpandedQA({...expandedQA, 3: !expandedQA[3]})}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-orange-500">
+                        <AlertCircle size={16} /> Q3: Why is my application highlighted?
+                      </h4>
+                      <ChevronRight size={18} className={cn("transition-transform", expandedQA[3] && "rotate-90")} />
+                    </div>
+                    {expandedQA[3] && (
+                      <div className="mt-3 pt-3 border-t border-slate-300 dark:border-slate-700 space-y-2 text-[11px]">
+                        <p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>This is a follow-up reminder based on time since last update:</p>
+                        <div className={cn("flex items-center gap-3 p-2 rounded", theme === 'dark' ? "bg-amber-500/10 border border-amber-500/20" : "bg-amber-50 border border-amber-200")}>
+                          <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                          <div>
+                            <p className="font-bold">7-14 days: Send follow-up email</p>
+                            <p className={cn("text-[10px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>Time to check in with the recruiter</p>
+                          </div>
+                        </div>
+                        <div className={cn("flex items-center gap-3 p-2 rounded", theme === 'dark' ? "bg-red-500/10 border border-red-500/20" : "bg-red-50 border border-red-200")}>
+                          <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                          <div>
+                            <p className="font-bold">14+ days: Urgent follow-up</p>
+                            <p className={cn("text-[10px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>Update your status to reset the timer!</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Q4 */}
+                  <button
+                    onClick={() => setExpandedQA({...expandedQA, 4: !expandedQA[4]})}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-cyan-500">
+                        <LayoutDashboard size={16} /> Q4: What do the dashboard charts show?
+                      </h4>
+                      <ChevronRight size={18} className={cn("transition-transform", expandedQA[4] && "rotate-90")} />
+                    </div>
+                    {expandedQA[4] && (
+                      <div className="mt-3 pt-3 border-t border-slate-300 dark:border-slate-700 space-y-2 text-[11px]">
+                        <div><p className="font-bold mb-1">📊 Status Breakdown (Donut Chart)</p><p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Shows how many applications in each status. Helps identify bottlenecks.</p></div>
+                        <div><p className="font-bold mb-1">🔥 Technical Skill Heatmap (Bar Chart)</p><p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Most frequently required technologies. Focus your learning on these!</p></div>
+                        <div><p className="font-bold mb-1">📈 Weekly Volume (Line Chart)</p><p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Application submissions over time. Aim for 3-5 per week.</p></div>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Q5 */}
+                  <button
+                    onClick={() => setExpandedQA({...expandedQA, 5: !expandedQA[5]})}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-purple-500">
+                        <User size={16} /> Q5: What goes in "Notes & Contacts"?
+                      </h4>
+                      <ChevronRight size={18} className={cn("transition-transform", expandedQA[5] && "rotate-90")} />
+                    </div>
+                    {expandedQA[5] && (
+                      <div className="mt-3 pt-3 border-t border-slate-300 dark:border-slate-700 space-y-2 text-[11px]">
+                        <div><p className="font-bold mb-0.5">👥 Contacts & Recruiters</p><p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Store recruiter/hiring manager name, email, and LinkedIn profile</p></div>
+                        <div><p className="font-bold mb-0.5">📄 Resume & Cover Letter</p><p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Track which version of your materials you submitted</p></div>
+                        <div><p className="font-bold mb-0.5">📝 Interview Notes & Research</p><p className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>Technical questions, company culture notes, salary expectations, follow-up reminders</p></div>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Q6 */}
+                  <button
+                    onClick={() => setExpandedQA({...expandedQA, 6: !expandedQA[6]})}
+                    className={cn("w-full text-left p-4 rounded-2xl border transition-all", theme === 'dark' ? "bg-white/2 border-slate-800 hover:bg-white/5" : "bg-slate-50/50 border-slate-200 hover:bg-slate-100/50")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-green-600">
+                        <Target size={16} /> Q6: Pro tips for success?
+                      </h4>
+                      <ChevronRight size={18} className={cn("transition-transform", expandedQA[6] && "rotate-90")} />
+                    </div>
+                    {expandedQA[6] && (
+                      <ul className="mt-3 pt-3 border-t border-slate-300 dark:border-slate-700 text-[11px] space-y-1.5 ml-4">
+                        <li className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>💡 <strong>Update status immediately</strong> after each interview or rejection</li>
+                        <li className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>💡 <strong>Aim for 3-5 applications per week</strong> for a healthy pipeline</li>
+                        <li className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>💡 <strong>Use the search bar</strong> to find similar companies or roles</li>
+                        <li className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>💡 <strong>Save all research notes</strong> before interviews</li>
+                        <li className={theme === 'dark' ? "text-slate-400" : "text-slate-600"}>💡 <strong>Track salary details</strong> in Notes for negotiations</li>
+                      </ul>
+                    )}
                   </button>
                 </div>
+                )}
+              </div>
+
+              {/* Overlay Buttons - Always Visible */}
+              <div className="p-8 pt-4 flex flex-col gap-3 border-t" style={{ borderColor: theme === 'dark' ? '#27272a' : '#e2e8f0' }}>
+                <button 
+                  onClick={handleWelcomeStart}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/20 active:scale-[0.98] uppercase tracking-[0.2em] text-[11px]"
+                >
+                  <Plus size={18} /> Add Your First Application
+                </button>
+                <button 
+                  onClick={handleWelcomeDismiss}
+                  className={cn(
+                    "w-full py-3 rounded-xl text-sm font-bold uppercase tracking-[0.2em] transition-all",
+                    theme === 'dark' ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-900"
+                  )}
+                >
+                  Explore First
+                </button>
               </div>
             </motion.div>
           </div>
