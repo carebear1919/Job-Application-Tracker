@@ -15,13 +15,16 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
+import { formatDistanceToNow, differenceInDays, parseISO, differenceInMinutes, differenceInHours } from 'date-fns';
 import { ContactModal, type Contact as ModalContact } from './components/ContactModal';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useThemeCustomization } from './hooks/useThemeCustomization';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StatusBreakdownDonut } from './components/StatusBreakdownDonut';
 import { WeeklyVolumeChart } from './components/WeeklyVolumeChart';
+import { LocationDistributionChart } from './components/LocationDistributionChart';
+import { PayRangeDistributionChart } from './components/PayRangeDistributionChart';
+import { SourceDistributionChart } from './components/SourceDistributionChart';
 
 // --- Utility ---
 function cn(...inputs: ClassValue[]) {
@@ -46,11 +49,13 @@ interface Job {
   status: JobStatus;
   date: string;
   updatedAt: string;
-  salary: string;
+  payRange?: string;
   link: string;
   skills: string[];
   contacts: Contact[];
   notes: string;
+  workLocation?: 'Remote' | 'Onsite' | 'Hybrid';
+  location?: string;
   resumeUrl?: string;
   coverLetterUrl?: string;
 }
@@ -78,6 +83,10 @@ const COMMON_SKILLS = [
   'UI Design', 'Figma', 'System Design', 'Testing'
 ].sort();
 
+const WORK_LOCATIONS = ['Remote', 'Onsite', 'Hybrid'];
+
+const ITEMS_PER_PAGE = 10;
+
 // --- Type Interfaces ---
 
 interface StatCardProps {
@@ -94,6 +103,20 @@ interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ name: string; value: number }>;
   theme: 'dark' | 'light';
+}
+
+// --- Helper Functions ---
+function formatTimeAgo(dateStr: string): string {
+  const date = parseISO(dateStr);
+  const now = new Date();
+  const minutes = differenceInMinutes(now, date);
+  const hours = differenceInHours(now, date);
+  const days = differenceInDays(now, date);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
 // --- Components ---
@@ -153,11 +176,17 @@ export default function App() {
   const [jobs, setJobs] = useLocalStorage<Job[]>('job_applications', INITIAL_JOBS);
   const [search, setSearch] = useLocalStorage<string>('job_search_query', '');
   const [statusFilter, setStatusFilter] = useLocalStorage<JobStatus | 'All'>('job_status_filter', 'All');
+  const [workLocationFilter, setWorkLocationFilter] = useLocalStorage<string>('job_location_type_filter', 'All');
+  const [locationFilter, setLocationFilter] = useLocalStorage<string>('job_location_filter', 'All');
+  const [sourceFilter, setSourceFilter] = useLocalStorage<string>('job_source_filter', 'All');
+  const [currentPage, setCurrentPage] = useLocalStorage<number>('job_current_page', 1);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('app_theme', 'dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [isEditMode, setIsEditMode] = useState(true);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [viewMode, setViewMode] = useLocalStorage<'default' | 'interview'>('job_view_mode', 'default');
+  const [detailViewTab, setDetailViewTab] = useState<'details' | 'contacts' | 'notes'>('details');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>('has_seen_welcome', false);
@@ -244,12 +273,13 @@ export default function App() {
 
   const openAddModal = useCallback(() => {
     setSelectedJob(null);
+    setIsEditMode(true);
     setJobForm({
       status: 'Applied',
       date: new Date().toISOString().split('T')[0],
       company: '',
       role: '',
-      salary: '',
+      payRange: '',
       link: '',
       skills: [],
       contacts: [],
@@ -262,6 +292,15 @@ export default function App() {
 
   const openEditModal = (job: Job) => {
     setSelectedJob(job);
+    setIsEditMode(true);
+    setJobForm(job);
+    setSourceInput(job.source);
+    setIsModalOpen(true);
+  };
+
+  const openViewModal = (job: Job) => {
+    setSelectedJob(job);
+    setIsEditMode(false);
     setJobForm(job);
     setSourceInput(job.source);
     setIsModalOpen(true);
@@ -350,11 +389,13 @@ export default function App() {
         status: jobForm.status as JobStatus,
         date: jobForm.date as string,
         updatedAt: timestamp,
-        salary: jobForm.salary || 'N/A',
+        payRange: jobForm.payRange || undefined,
         link: jobForm.link || '#',
         skills: jobForm.skills || [],
         contacts: jobForm.contacts || [],
-        notes: jobForm.notes || ''
+        notes: jobForm.notes || '',
+        workLocation: jobForm.workLocation,
+        location: jobForm.location,
       };
       setJobs((prev: Job[]) => [job, ...prev]);
     }
@@ -413,12 +454,36 @@ export default function App() {
     };
   }, [jobs]);
 
+  // Extract available locations from jobs
+  const availableLocations = Array.from(
+    new Set(jobs.filter(job => job.location).map(job => job.location))
+  ).sort() as string[];
+
+  // Extract available sources from jobs
+  const availableSources = Array.from(
+    new Set(jobs.map(job => job.source))
+  ).sort() as string[];
+
   const filteredJobs = jobs.filter(job => {
     const searchString = `${job.company} ${job.role} ${job.skills.join(' ')}`.toLowerCase();
     const matchesSearch = searchString.includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'All' || job.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesWorkLocation = workLocationFilter === 'All' || job.workLocation === workLocationFilter;
+    const matchesLocation = locationFilter === 'All' || job.location === locationFilter;
+    const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
+    return matchesSearch && matchesStatus && matchesWorkLocation && matchesLocation && matchesSource;
   });
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, workLocationFilter, locationFilter, sourceFilter]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
+  const validPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  const startIdx = (validPage - 1) * ITEMS_PER_PAGE;
+  const paginatedJobs = filteredJobs.slice(startIdx, startIdx + ITEMS_PER_PAGE);
 
   const getStaleLevel = (updatedAt: string) => {
     const days = differenceInDays(new Date(), parseISO(updatedAt));
@@ -637,12 +702,63 @@ export default function App() {
                 </div>
               </motion.div>
             </div>
+
+            {/* Location, Pay Range, and Source Analytics */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
+              {/* Location Distribution */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="lg:col-span-4"
+              >
+                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <Briefcase size={14} className="text-indigo-500" />
+                    Job Locations
+                  </h3>
+                  <LocationDistributionChart jobs={jobs} theme={theme} primaryColor={colors.primary} />
+                </div>
+              </motion.div>
+
+              {/* Pay Range Distribution */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="lg:col-span-4"
+              >
+                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <TrendingUp size={14} className="text-emerald-500" />
+                    Pay Range Distribution
+                  </h3>
+                  <PayRangeDistributionChart jobs={jobs} theme={theme} primaryColor="#10b981" />
+                </div>
+              </motion.div>
+
+              {/* Source Distribution */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="lg:col-span-4"
+              >
+                <div className={cn("p-8", theme === 'dark' ? "glass-card border-slate-800/50" : "glass-card-light")}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 mb-8 uppercase tracking-widest text-slate-500">
+                    <Target size={14} className="text-rose-500" />
+                    Application Sources
+                  </h3>
+                  <SourceDistributionChart jobs={jobs} theme={theme} />
+                </div>
+              </motion.div>
+            </div>
           </>
         )}
 
         {/* Filters & Search */}
-        <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-96">
+        <div className="mb-6 space-y-4">
+          <div className="relative w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
               type="text" 
@@ -658,8 +774,8 @@ export default function App() {
             />
           </div>
           
-          {/* Desktop filter buttons */}
-          <div className="hidden lg:flex flex-wrap items-center gap-1.5 justify-end">
+          {/* Desktop filter buttons for status */}
+          <div className="hidden lg:flex flex-wrap items-center gap-1.5">
             {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
               <button
                 key={stat}
@@ -678,25 +794,144 @@ export default function App() {
             ))}
           </div>
 
-          {/* Mobile filter dropdown */}
-          <div className="lg:hidden w-full relative">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className={cn(
-                "w-full rounded-xl pl-12 pr-10 py-3 text-sm font-bold uppercase tracking-wider border outline-none appearance-none transition-all shadow-sm",
-                theme === 'dark'
-                  ? "bg-[#18181b] border-slate-800 text-slate-300 focus:ring-2 focus:ring-indigo-500/30"
-                  : "bg-white border-slate-200 text-slate-700 focus:ring-2 focus:ring-indigo-500/10"
-              )}
-            >
-              {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
-                <option key={stat} value={stat}>{stat === 'All' ? 'All Statuses' : stat}</option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-               <ChevronRight size={16} className="rotate-90" />
+          {/* Additional Filters Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:hidden">
+            {/* Status Filter - Mobile */}
+            <div className="relative col-span-2 md:col-span-1">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className={cn(
+                  "w-full rounded-xl px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                {(['All', 'Applied', 'Interviewing', 'Technical', 'Offer', 'Rejected'] as const).map((stat) => (
+                  <option key={stat} value={stat}>{stat === 'All' ? 'Status' : stat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Work Location Type Filter */}
+            <div className="relative col-span-2 md:col-span-1">
+              <select
+                value={workLocationFilter}
+                onChange={(e) => setWorkLocationFilter(e.target.value)}
+                className={cn(
+                  "w-full rounded-xl px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                <option value="All">Work Type</option>
+                {WORK_LOCATIONS.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Location Filter */}
+            <div className="relative col-span-2 md:col-span-1">
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className={cn(
+                  "w-full rounded-xl px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                <option value="All">Location</option>
+                {availableLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Source Filter */}
+            <div className="relative col-span-2 md:col-span-1">
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                className={cn(
+                  "w-full rounded-xl px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                <option value="All">Source</option>
+                {availableSources.map(src => (
+                  <option key={src} value={src}>{src}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Desktop Additional Filters */}
+          <div className="hidden lg:grid grid-cols-3 gap-3">
+            {/* Work Location Type Filter */}
+            <div className="relative">
+              <select
+                value={workLocationFilter}
+                onChange={(e) => setWorkLocationFilter(e.target.value)}
+                className={cn(
+                  "w-full rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                <option value="All">All Work Types</option>
+                {WORK_LOCATIONS.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none text-slate-400" size={14} />
+            </div>
+
+            {/* Location Filter */}
+            <div className="relative">
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className={cn(
+                  "w-full rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                <option value="All">All Locations</option>
+                {availableLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none text-slate-400" size={14} />
+            </div>
+
+            {/* Source Filter */}
+            <div className="relative">
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                className={cn(
+                  "w-full rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider border outline-none appearance-none transition-all",
+                  theme === 'dark'
+                    ? "bg-[#18181b] border-slate-800 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                )}
+              >
+                <option value="All">All Sources</option>
+                {availableSources.map(src => (
+                  <option key={src} value={src}>{src}</option>
+                ))}
+              </select>
+              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none text-slate-400" size={14} />
             </div>
           </div>
         </div>
@@ -719,14 +954,14 @@ export default function App() {
                   )}>
                     <th className="px-8 py-5">Corporate entity</th>
                     <th className="px-8 py-5">current state</th>
-                    <th className="px-8 py-5">Stack & Skills</th>
+                    <th className="px-8 py-5">Work Type & Pay</th>
                     <th className="px-8 py-5">Last Cycle</th>
                     <th className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className={cn("divide-y", theme === 'dark' ? "divide-slate-800/50" : "divide-slate-100")}>
                   <AnimatePresence mode="wait">
-                    {filteredJobs.length > 0 ? filteredJobs.map((job) => {
+                    {paginatedJobs.length > 0 ? paginatedJobs.map((job) => {
                       const staleLevel = getStaleLevel(job.updatedAt);
                       return (
                         <motion.tr 
@@ -735,7 +970,7 @@ export default function App() {
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.15 }}
                           key={job.id} 
-                          onClick={() => openEditModal(job)}
+                          onClick={() => openViewModal(job)}
                           className={cn(
                             "transition-all group cursor-pointer relative",
                             theme === 'dark' ? "hover:bg-indigo-500/3" : "hover:bg-indigo-50",
@@ -780,24 +1015,29 @@ export default function App() {
                             </span>
                           </td>
                           <td className="px-8 py-6">
-                            <div className="flex flex-wrap gap-1">
-                              {job.skills.slice(0, 3).map(skill => (
-                                <span key={skill} className={cn(
-                                  "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tight",
-                                  theme === 'dark' ? "bg-white/5 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                            <div className="flex flex-col gap-1.5">
+                              {job.workLocation && (
+                                <span className={cn(
+                                  "text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-tight w-fit",
+                                  theme === 'dark' ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-indigo-50 border-indigo-200 text-indigo-600"
                                 )}>
-                                  {skill}
+                                  {job.workLocation}
                                 </span>
-                              ))}
-                              {job.skills.length > 3 && (
-                                  <span className="text-[9px] text-slate-500 font-bold">+{job.skills.length - 3}</span>
+                              )}
+                              {job.payRange && (
+                                <span className={cn(
+                                  "text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-tight w-fit",
+                                  theme === 'dark' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                )}>
+                                  {job.payRange}
+                                </span>
                               )}
                             </div>
                           </td>
                           <td className="px-8 py-6">
                             <div className="flex flex-col">
                               <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
-                                {formatDistanceToNow(parseISO(job.updatedAt))} ago
+                                {formatTimeAgo(job.updatedAt)}
                                 {staleLevel !== 'none' && (
                                   <div className={cn(
                                     "w-2 h-2 rounded-full animate-pulse",
@@ -812,7 +1052,7 @@ export default function App() {
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  openEditModal(job);
+                                  openViewModal(job);
                                 }}
                                 className={cn(
                                   "p-2 rounded-lg transition-all",
@@ -875,12 +1115,57 @@ export default function App() {
                 </tbody>
               </table>
             </div>
+
+            {/* Desktop Pagination Controls */}
+            {filteredJobs.length > ITEMS_PER_PAGE && (
+              <div className="px-8 py-6 border-t flex items-center justify-between" style={{
+                borderColor: theme === 'dark' ? 'rgba(30, 30, 36, 0.5)' : 'rgba(226, 232, 240, 1)'
+              }}>
+                <div className={cn("text-sm font-medium", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>
+                  Page <span className="font-bold">{validPage}</span> of <span className="font-bold">{totalPages}</span> • Showing <span className="font-bold">{paginatedJobs.length}</span> of <span className="font-bold">{filteredJobs.length}</span> jobs
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, validPage - 1))}
+                    disabled={validPage === 1}
+                    className={cn(
+                      "px-4 py-2 rounded-lg font-bold text-sm uppercase tracking-widest transition-all border",
+                      validPage === 1
+                        ? theme === 'dark'
+                          ? "bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed"
+                          : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                        : theme === 'dark'
+                          ? "bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700"
+                          : "bg-slate-100 border-slate-300 text-slate-900 hover:bg-slate-50"
+                    )}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, validPage + 1))}
+                    disabled={validPage === totalPages}
+                    className={cn(
+                      "px-4 py-2 rounded-lg font-bold text-sm uppercase tracking-widest transition-all border",
+                      validPage === totalPages
+                        ? theme === 'dark'
+                          ? "bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed"
+                          : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                        : theme === 'dark'
+                          ? "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500"
+                          : "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500"
+                    )}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Mobile Card View */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
             <AnimatePresence mode="wait">
-              {filteredJobs.length > 0 ? filteredJobs.map((job) => {
+              {paginatedJobs.length > 0 ? paginatedJobs.map((job) => {
                 const staleLevel = getStaleLevel(job.updatedAt);
                 return (
                   <motion.div
@@ -889,7 +1174,7 @@ export default function App() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
                     key={job.id}
-                    onClick={() => openEditModal(job)}
+                    onClick={() => openViewModal(job)}
                     className={cn(
                       "p-5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group",
                       theme === 'dark' ? "bg-[#18181b] border-slate-800 hover:border-indigo-500/50" : "bg-white border-slate-200 hover:border-indigo-500/50 shadow-sm",
@@ -949,7 +1234,7 @@ export default function App() {
                     <div className="flex items-center justify-between pt-4 border-t border-slate-500/10">
                       <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
                         <Clock size={12} />
-                        {formatDistanceToNow(parseISO(job.updatedAt))} ago
+                        {formatTimeAgo(job.updatedAt)}
                         {staleLevel !== 'none' && (
                           <div className={cn(
                             "w-2 h-2 rounded-full animate-pulse",
@@ -1003,6 +1288,51 @@ export default function App() {
                 </div>
               )}
             </AnimatePresence>
+
+            {/* Mobile Pagination Controls */}
+            {filteredJobs.length > ITEMS_PER_PAGE && (
+              <div className="mt-6 flex flex-col gap-4 p-4 border-t" style={{
+                borderColor: theme === 'dark' ? 'rgba(30, 30, 36, 0.5)' : 'rgba(226, 232, 240, 1)'
+              }}>
+                <div className={cn("text-sm font-medium text-center", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>
+                  Page <span className="font-bold">{validPage}</span> of <span className="font-bold">{totalPages}</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, validPage - 1))}
+                    disabled={validPage === 1}
+                    className={cn(
+                      "px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border flex-1",
+                      validPage === 1
+                        ? theme === 'dark'
+                          ? "bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed"
+                          : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                        : theme === 'dark'
+                          ? "bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700"
+                          : "bg-slate-100 border-slate-300 text-slate-900 hover:bg-slate-50"
+                    )}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, validPage + 1))}
+                    disabled={validPage === totalPages}
+                    className={cn(
+                      "px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border flex-1",
+                      validPage === totalPages
+                        ? theme === 'dark'
+                          ? "bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed"
+                          : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                        : theme === 'dark'
+                          ? "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500"
+                          : "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500"
+                    )}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
@@ -1130,64 +1460,254 @@ export default function App() {
                     </button>
                   </div>
 
-                  <nav className="flex gap-1.5 mb-4">
-                    <button 
-                      onClick={() => setViewMode('default')}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
-                        viewMode === 'default' 
-                          ? (theme === 'dark' ? "bg-white/10 text-white" : "bg-white shadow-sm text-indigo-600 border border-slate-200")
-                          : "text-slate-500 hover:text-slate-300"
-                      )}
-                    >
-                      <LayoutDashboard size={13} /> Application Details
-                    </button>
-                    <button 
-                      onClick={() => setViewMode('interview')}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
-                        viewMode === 'interview' 
-                          ? "bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-lg shadow-amber-500/5" 
-                          : "text-slate-500 hover:text-amber-500/60"
-                      )}
-                    >
-                      <AlertCircle size={13} /> Notes & Contacts
-                    </button>
-                  </nav>
+                  {isEditMode && (
+                    <>
+                      <nav className="flex gap-1.5 mb-4">
+                        <button 
+                          onClick={() => setViewMode('default')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
+                            viewMode === 'default' 
+                              ? (theme === 'dark' ? "bg-white/10 text-white" : "bg-white shadow-sm text-indigo-600 border border-slate-200")
+                              : "text-slate-500 hover:text-slate-300"
+                          )}
+                        >
+                          <LayoutDashboard size={13} /> Application Details
+                        </button>
+                        <button 
+                          onClick={() => setViewMode('interview')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-widest",
+                            viewMode === 'interview' 
+                              ? "bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-lg shadow-amber-500/5" 
+                              : "text-slate-500 hover:text-amber-500/60"
+                          )}
+                        >
+                          <AlertCircle size={13} /> Notes & Contacts
+                        </button>
+                      </nav>
 
-                  {selectedJob && (
-                    <div className={cn("flex gap-6 text-[9px] border-t pt-4", theme === 'dark' ? "border-slate-800" : "border-slate-200")}>
-                      <div className="flex items-center gap-1.5">
-                        <Calendar size={12} className="text-slate-500" />
-                        <div>
-                          <p className="text-slate-600 font-bold uppercase">Applied</p>
-                          <p className={cn("font-bold font-mono text-[8px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{selectedJob.date}</p>
+                      {selectedJob && (
+                        <div className={cn("flex gap-6 text-[9px] border-t pt-4", theme === 'dark' ? "border-slate-800" : "border-slate-200")}>
+                          <div className="flex items-center gap-1.5">
+                            <Calendar size={12} className="text-slate-500" />
+                            <div>
+                              <p className="text-slate-600 font-bold uppercase">Applied</p>
+                              <p className={cn("font-bold font-mono text-[8px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{selectedJob.date}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Clock size={12} className="text-slate-500" />
+                            <div>
+                              <p className="text-slate-600 font-bold uppercase">Last Sync</p>
+                              <p className={cn("font-bold font-mono text-[8px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{formatTimeAgo(selectedJob.updatedAt)}</p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock size={12} className="text-slate-500" />
-                        <div>
-                          <p className="text-slate-600 font-bold uppercase">Last Sync</p>
-                          <p className={cn("font-bold font-mono text-[8px]", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{formatDistanceToNow(parseISO(selectedJob.updatedAt))} ago</p>
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Main Content Area */}
                 <div className="flex-1 p-8 md:p-10 overflow-y-auto">
-                  <div className="mb-6">
-                    <h3 className={cn("text-lg font-bold uppercase tracking-[0.3em]", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>
-                      {viewMode === 'default' ? (selectedJob ? 'Update Application' : 'Add New Application') : 'Notes & Contacts'}
-                    </h3>
-                  </div>
+                  {!isEditMode && selectedJob ? (
+                    <>
+                      {/* Detail View Tabs */}
+                      <nav className="flex gap-2 mb-8 border-b" style={{ borderColor: theme === 'dark' ? '#27272a' : '#e2e8f0' }}>
+                        <button
+                          onClick={() => setDetailViewTab('details')}
+                          className={cn(
+                            "px-4 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 transition-all",
+                            detailViewTab === 'details'
+                              ? (theme === 'dark' ? "text-indigo-500 border-indigo-500" : "text-indigo-600 border-indigo-600")
+                              : (theme === 'dark' ? "text-slate-500 border-transparent hover:text-slate-300" : "text-slate-500 border-transparent hover:text-slate-700")
+                          )}
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => setDetailViewTab('contacts')}
+                          className={cn(
+                            "px-4 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 transition-all",
+                            detailViewTab === 'contacts'
+                              ? (theme === 'dark' ? "text-indigo-500 border-indigo-500" : "text-indigo-600 border-indigo-600")
+                              : (theme === 'dark' ? "text-slate-500 border-transparent hover:text-slate-300" : "text-slate-500 border-transparent hover:text-slate-700")
+                          )}
+                        >
+                          Contacts
+                        </button>
+                        <button
+                          onClick={() => setDetailViewTab('notes')}
+                          className={cn(
+                            "px-4 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 transition-all",
+                            detailViewTab === 'notes'
+                              ? (theme === 'dark' ? "text-indigo-500 border-indigo-500" : "text-indigo-600 border-indigo-600")
+                              : (theme === 'dark' ? "text-slate-500 border-transparent hover:text-slate-300" : "text-slate-500 border-transparent hover:text-slate-700")
+                          )}
+                        >
+                          Notes
+                        </button>
+                      </nav>
 
-                  {viewMode === 'default' ? (
-                    <form onSubmit={handleSubmit} className="space-y-8 w-full">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Company Name *</label>
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                        {/* Details Tab */}
+                        {detailViewTab === 'details' && (
+                          <div className="space-y-8">
+                            {/* Company & Role */}
+                            <div className="space-y-6">
+                              <div>
+                                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Company</p>
+                                <h2 className={cn("text-4xl font-bold mb-4", theme === 'dark' ? "text-white" : "text-slate-900")}>{selectedJob.company}</h2>
+                              </div>
+                              <div>
+                                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Position</p>
+                                <h3 className={cn("text-2xl font-bold", theme === 'dark' ? "text-slate-100" : "text-slate-800")}>{selectedJob.role}</h3>
+                              </div>
+                            </div>
+
+                            {/* Job Link */}
+                            {selectedJob.link && selectedJob.link !== '#' && (
+                              <a 
+                                href={selectedJob.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(
+                                  "block p-5 rounded-2xl border transition-all hover:scale-105 group",
+                                  theme === 'dark' ? "bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20 hover:border-indigo-500/50" : "bg-indigo-50 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 shadow-sm"
+                                )}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>Job Posting</p>
+                                    <p className={cn("font-bold truncate group-hover:underline", theme === 'dark' ? "text-indigo-400" : "text-indigo-600")}>{selectedJob.link}</p>
+                                  </div>
+                                  <ExternalLink size={20} className={cn("shrink-0 ml-3 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1", theme === 'dark' ? "text-indigo-400" : "text-indigo-600")} />
+                                </div>
+                              </a>
+                            )}
+
+                            {/* Status & Details Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Status</p>
+                                <span className={cn("inline-block px-3 py-1.5 rounded-lg text-sm font-bold text-white", theme === 'dark' ? "bg-slate-700" : "bg-slate-600")} style={{ backgroundColor: STATUS_COLORS[selectedJob.status as JobStatus] }}>
+                                  {selectedJob.status}
+                                </span>
+                              </div>
+                              <div className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Source</p>
+                                <p className={cn("text-sm font-bold", theme === 'dark' ? "text-slate-200" : "text-slate-800")}>{selectedJob.source}</p>
+                              </div>
+                              {selectedJob.workLocation && (
+                                <div className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                  <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Work Location</p>
+                                  <p className={cn("text-sm font-bold", theme === 'dark' ? "text-slate-200" : "text-slate-800")}>{selectedJob.workLocation}</p>
+                                </div>
+                              )}
+                              {selectedJob.location && (
+                                <div className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                  <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Location</p>
+                                  <p className={cn("text-sm font-bold", theme === 'dark' ? "text-slate-200" : "text-slate-800")}>{selectedJob.location}</p>
+                                </div>
+                              )}
+                              {selectedJob.payRange && (
+                                <div className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                  <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Pay Range</p>
+                                  <p className={cn("text-sm font-bold", theme === 'dark' ? "text-slate-200" : "text-slate-800")}>{selectedJob.payRange}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Skills */}
+                            {selectedJob.skills && selectedJob.skills.length > 0 && (
+                              <div className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-3", theme === 'dark' ? "text-slate-500" : "text-slate-400")}>Required Skills</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedJob.skills.map(skill => (
+                                    <span key={skill} className="px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-tight">
+                                      {skill}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Contacts Tab */}
+                        {detailViewTab === 'contacts' && (
+                          <div className="space-y-4">
+                            {selectedJob.contacts && selectedJob.contacts.length > 0 ? (
+                              <div className="space-y-3">
+                                {selectedJob.contacts.map((contact, idx) => (
+                                  <div key={idx} className={cn("p-5 rounded-2xl border", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                    <p className={cn("font-bold text-lg", theme === 'dark' ? "text-white" : "text-slate-900")}>{contact.name}</p>
+                                    {contact.role && <p className={cn("text-xs font-bold uppercase tracking-wider mt-1", theme === 'dark' ? "text-slate-400" : "text-slate-600")}>{contact.role}</p>}
+                                    {contact.email && (
+                                      <p className={cn("text-sm font-bold mt-2", theme === 'dark' ? "text-indigo-400" : "text-indigo-600")}>
+                                        {contact.email}
+                                      </p>
+                                    )}
+                                    {contact.linkedin && (
+                                      <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className={cn("text-sm font-bold mt-1 hover:underline", theme === 'dark' ? "text-indigo-400" : "text-indigo-600")}>
+                                        LinkedIn Profile
+                                      </a>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className={cn("p-8 rounded-2xl border text-center", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                <User size={32} className={cn("mx-auto mb-3", theme === 'dark' ? "text-slate-600" : "text-slate-400")} />
+                                <p className={cn("text-sm font-bold", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>No contacts added yet</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Notes Tab */}
+                        {detailViewTab === 'notes' && (
+                          <div>
+                            {selectedJob.notes ? (
+                              <div className={cn("p-5 rounded-2xl border whitespace-pre-wrap", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                <p className={cn("text-sm leading-relaxed", theme === 'dark' ? "text-slate-300" : "text-slate-700")}>{selectedJob.notes}</p>
+                              </div>
+                            ) : (
+                              <div className={cn("p-8 rounded-2xl border text-center", theme === 'dark' ? "bg-white/2 border-slate-800" : "bg-slate-50 border-slate-200")}>
+                                <FileText size={32} className={cn("mx-auto mb-3", theme === 'dark' ? "text-slate-600" : "text-slate-400")} />
+                                <p className={cn("text-sm font-bold", theme === 'dark' ? "text-slate-400" : "text-slate-500")}>No notes added yet</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-4 pt-8 border-t" style={{ borderColor: theme === 'dark' ? '#27272a' : '#e2e8f0' }}>
+                          <button 
+                            type="button"
+                            onClick={() => setIsEditMode(true)}
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/20 active:scale-[0.98] uppercase tracking-[0.2em]"
+                          >
+                            <Edit2 size={18} /> Edit Job
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteJob(selectedJob.id)}
+                            className="px-8 py-4 rounded-2xl border border-red-500/20 text-red-500 font-bold text-[10px] hover:bg-red-500/10 transition-all uppercase tracking-[0.2em]"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </motion.div>
+                    </>
+                  ) : (
+                    <>
+                      {viewMode === 'default' ? (
+                        <form onSubmit={handleSubmit} className="space-y-8 w-full">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Company Name *</label>
                           <input 
                             required
                             type="text" 
@@ -1285,6 +1805,51 @@ export default function App() {
                              }}
                           />
                           {formErrors.link && <p className="text-xs text-red-500 font-bold px-1">{formErrors.link}</p>}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Work Location (Optional)</label>
+                          <select 
+                            className={cn(
+                                "input-base font-bold",
+                                theme === 'dark' ? "bg-zinc-900/50" : "bg-slate-50"
+                            )}
+                            value={jobForm.workLocation || ''}
+                            onChange={(e) => setJobForm({...jobForm, workLocation: e.target.value as any})}
+                          >
+                            <option value="">Select location type...</option>
+                            {WORK_LOCATIONS.map(loc => (
+                              <option key={loc} value={loc}>{loc}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">City / Region (Optional)</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g., San Francisco, Remote"
+                            className={cn(
+                                "input-base font-bold",
+                                theme === 'dark' ? "bg-zinc-900/50" : "bg-slate-50"
+                            )}
+                            value={jobForm.location || ''}
+                            onChange={(e) => setJobForm({...jobForm, location: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Pay Range (Optional)</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g., 100k-120k"
+                            className={cn(
+                                "input-base font-bold",
+                                theme === 'dark' ? "bg-zinc-900/50" : "bg-slate-50"
+                            )}
+                            value={jobForm.payRange || ''}
+                            onChange={(e) => setJobForm({...jobForm, payRange: e.target.value})}
+                          />
                         </div>
                       </div>
 
@@ -1491,6 +2056,8 @@ export default function App() {
                         </button>                     </div>
 
                     </motion.div>
+                  )}
+                    </>
                   )}
                 </div>
               </div>

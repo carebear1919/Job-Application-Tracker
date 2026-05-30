@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 interface StorageData<T> {
   version: number;
@@ -14,9 +14,24 @@ interface MigrationStrategy {
 }
 
 const migrationStrategies: MigrationStrategy[] = [
-  // Example: Add migrations here for future versions
-  // { fromVersion: 1, toVersion: 2, migrate: (data) => ({ ...data, newField: 'default' }) }
+  {
+    fromVersion: 1,
+    toVersion: 2,
+    migrate: (data: any) => {
+      // Handle job_applications array - add new optional fields to existing jobs
+      if (Array.isArray(data)) {
+        return data.map(job => ({
+          ...job,
+          workLocation: job.workLocation || undefined,
+          location: job.location || undefined,
+          payRange: job.payRange || (job.salary && job.salary !== 'N/A' ? job.salary : undefined),
+        }));
+      }
+      return data;
+    }
+  }
 ];
+
 
 function migrate<T>(data: any, fromVersion: number, toVersion: number): T {
   let migratedData = data;
