@@ -15,7 +15,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { formatDistanceToNow, differenceInDays, parseISO, differenceInMinutes, differenceInHours } from 'date-fns';
+import { formatDistanceToNow, differenceInDays, parseISO, differenceInMinutes, differenceInHours, format } from 'date-fns';
 import { ContactModal, type Contact as ModalContact } from './components/ContactModal';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useThemeCustomization } from './hooks/useThemeCustomization';
@@ -48,6 +48,7 @@ interface Job {
   source: string;
   status: JobStatus;
   date: string;
+  appliedAt?: string;
   updatedAt: string;
   payRange?: string;
   link: string;
@@ -117,6 +118,11 @@ function formatTimeAgo(dateStr: string): string {
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
+}
+
+function formatAppliedDate(dateStr: string): string {
+  const date = parseISO(dateStr);
+  return format(date, 'MMM d, yyyy h:mm a');
 }
 
 // --- Components ---
@@ -277,6 +283,7 @@ export default function App() {
     setJobForm({
       status: 'Applied',
       date: new Date().toISOString().split('T')[0],
+      appliedAt: new Date().toISOString(),
       company: '',
       role: '',
       payRange: '',
@@ -378,6 +385,7 @@ export default function App() {
         ...j, 
         ...jobForm, 
         source: sourceInput,
+        appliedAt: j.appliedAt || jobForm.appliedAt || (jobForm.date ? jobForm.date + 'T00:00:00' : j.appliedAt),
         updatedAt: jobForm.status !== j.status ? timestamp : j.updatedAt 
       } as Job : j));
     } else {
@@ -388,6 +396,7 @@ export default function App() {
         source: sourceInput || 'Direct',
         status: jobForm.status as JobStatus,
         date: jobForm.date as string,
+        appliedAt: jobForm.appliedAt || new Date().toISOString(),
         updatedAt: timestamp,
         payRange: jobForm.payRange || undefined,
         link: jobForm.link || '#',
@@ -955,7 +964,7 @@ export default function App() {
                     <th className="px-8 py-5">Corporate entity</th>
                     <th className="px-8 py-5">current state</th>
                     <th className="px-8 py-5">Work Type & Pay</th>
-                    <th className="px-8 py-5">Last Cycle</th>
+                    <th className="px-8 py-5">Date Applied</th>
                     <th className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1037,7 +1046,7 @@ export default function App() {
                           <td className="px-8 py-6">
                             <div className="flex flex-col">
                               <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
-                                {formatTimeAgo(job.updatedAt)}
+                                {formatAppliedDate(job.appliedAt || job.date + 'T00:00:00')}
                                 {staleLevel !== 'none' && (
                                   <div className={cn(
                                     "w-2 h-2 rounded-full animate-pulse",
@@ -1233,8 +1242,8 @@ export default function App() {
 
                     <div className="flex items-center justify-between pt-4 border-t border-slate-500/10">
                       <span className="text-[11px] text-slate-500 font-mono flex items-center gap-2 font-bold">
-                        <Clock size={12} />
-                        {formatTimeAgo(job.updatedAt)}
+                        <Calendar size={12} />
+                        {formatAppliedDate(job.appliedAt || job.date + 'T00:00:00')}
                         {staleLevel !== 'none' && (
                           <div className={cn(
                             "w-2 h-2 rounded-full animate-pulse",
